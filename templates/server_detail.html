@@ -106,9 +106,26 @@
     let charts = {};
     let autoRefreshInterval = null;
     let isAutoRefreshEnabled = true;
+    
+    // Validate server ID
+    if (!sid || isNaN(sid)) {
+      console.error('Invalid server ID:', sid);
+      document.body.innerHTML = '<div class="error-message">Ошибка: Неверный ID сервера</div>';
+    }
 
     function makeChart(id, label, yMax, color = '#3b82f6') {
-      const ctx = document.getElementById(id).getContext('2d');
+      const canvas = document.getElementById(id);
+      if (!canvas) {
+        console.error(`Canvas element with id '${id}' not found`);
+        return;
+      }
+      
+      if (typeof Chart === 'undefined') {
+        console.error('Chart.js library not loaded');
+        return;
+      }
+      
+      const ctx = canvas.getContext('2d');
       charts[id] = new Chart(ctx, {
         type: 'line',
         data: { 
@@ -166,19 +183,36 @@
 
     async function load() {
       try {
-        const minutes = document.getElementById('range').value;
+        const rangeElement = document.getElementById('range');
+        if (!rangeElement) {
+          console.error('Range element not found');
+          return;
+        }
+        
+        const minutes = rangeElement.value;
         const res = await fetch(`/api/metrics/${sid}?minutes=${minutes}`);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const hist = await res.json();
         
-        if (hist.length === 0) {
-          console.warn('No metrics data available');
+        if (!hist || hist.length === 0) {
+          console.log('No metrics data available');
           return;
         }
 
-        const labels = hist.map(h => new Date(h.timestamp).toLocaleTimeString('ru-RU', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }));
+        const labels = hist.map(h => {
+          try {
+            return new Date(h.timestamp).toLocaleTimeString('ru-RU', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+          } catch (e) {
+            return 'Invalid time';
+          }
+        });
 
         updateChart('cpu', labels, hist.map(h => h.cpu_percent || 0));
         updateChart('ram', labels, hist.map(h => h.ram_percent || 0));
@@ -187,12 +221,22 @@
         updateChart('proc', labels, hist.map(h => h.processes || 0));
       } catch (error) {
         console.error('Failed to load metrics:', error);
-        showNotification('Ошибка загрузки метрик', 'error');
+        // Show error message in UI
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.textContent = 'Ошибка загрузки метрик: ' + error.message;
+        errorDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 10px; border-radius: 5px; z-index: 1000;';
+        document.body.appendChild(errorDiv);
+        setTimeout(() => errorDiv.remove(), 5000);
       }
     }
 
     function toggleAutoRefresh() {
       const button = document.getElementById('autoRefresh');
+      if (!button) {
+        console.error('Auto refresh button not found');
+        return;
+      }
       
       if (isAutoRefreshEnabled) {
         clearInterval(autoRefreshInterval);
@@ -208,18 +252,34 @@
     }
 
     // Initialize charts with different colors
-    makeChart('cpu', 'CPU %', 100, '#ef4444');
-    makeChart('ram', 'RAM %', 100, '#f59e0b');
-    makeChart('disk', 'Disk %', 100, '#10b981');
-    makeChart('net', 'Network Kbps', null, '#3b82f6');
-    makeChart('proc', 'Processes', null, '#8b5cf6');
+    try {
+      makeChart('cpu', 'CPU %', 100, '#ef4444');
+      makeChart('ram', 'RAM %', 100, '#f59e0b');
+      makeChart('disk', 'Disk %', 100, '#10b981');
+      makeChart('net', 'Network Kbps', null, '#3b82f6');
+      makeChart('proc', 'Processes', null, '#8b5cf6');
+    } catch (error) {
+      console.error('Failed to initialize charts:', error);
+    }
 
     // Load initial data
     load();
 
     // Event listeners
-    document.getElementById('range').addEventListener('change', load);
-    document.getElementById('autoRefresh').addEventListener('click', toggleAutoRefresh);
+    const rangeElement = document.getElementById('range');
+    const autoRefreshElement = document.getElementById('autoRefresh');
+    
+    if (rangeElement) {
+      rangeElement.addEventListener('change', load);
+    } else {
+      console.error('Range element not found for event listener');
+    }
+    
+    if (autoRefreshElement) {
+      autoRefreshElement.addEventListener('click', toggleAutoRefresh);
+    } else {
+      console.error('Auto refresh element not found for event listener');
+    }
 
     // Start auto-refresh
     autoRefreshInterval = setInterval(load, 10000);
