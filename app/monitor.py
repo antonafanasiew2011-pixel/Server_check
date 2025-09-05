@@ -343,6 +343,40 @@ async def retention_job(db_factory):
         await db.commit()
 
 
+def format_telegram_message(message: str) -> str:
+    """Format alert message for Telegram with HTML formatting"""
+    # Extract information from message
+    lines = message.split('\n')
+    
+    # Determine alert type and emoji
+    if 'critical' in message.lower() or 'критично' in message.lower():
+        emoji = "🚨"
+        alert_type = "КРИТИЧЕСКИЙ АЛЕРТ"
+    elif 'warning' in message.lower() or 'предупреждение' in message.lower():
+        emoji = "⚠️"
+        alert_type = "ПРЕДУПРЕЖДЕНИЕ"
+    else:
+        emoji = "ℹ️"
+        alert_type = "ИНФОРМАЦИЯ"
+    
+    # Format message
+    formatted = f"{emoji} <b>{alert_type}</b>\n\n"
+    
+    # Add main message
+    if lines:
+        formatted += f"<b>Сообщение:</b>\n{lines[0]}\n\n"
+    
+    # Add timestamp
+    from datetime import datetime
+    moscow_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted += f"<b>Время:</b> {moscow_time}\n"
+    
+    # Add source
+    formatted += f"<b>Источник:</b> Server Check Monitor"
+    
+    return formatted
+
+
 async def dispatch_notifications(message: str):
     # Email
     smtp_from = settings.smtp_from or settings.smtp_from_email
@@ -365,9 +399,19 @@ async def dispatch_notifications(message: str):
     # Telegram
     if settings.telegram_bot_token and settings.telegram_chat_id:
         try:
+            # Format message for Telegram with emojis and better structure
+            formatted_message = format_telegram_message(message)
+            
             url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
+            payload = {
+                "chat_id": settings.telegram_chat_id,
+                "text": formatted_message,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True
+            }
+            
             async with httpx.AsyncClient(timeout=10) as client:
-                await client.post(url, json={"chat_id": settings.telegram_chat_id, "text": message})
+                await client.post(url, json=payload)
         except Exception:
             pass
     

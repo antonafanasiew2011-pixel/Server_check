@@ -881,3 +881,23 @@ async def export_report_pdf(request: Request, db: AsyncSession = Depends(get_db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
 
+
+# ---- Test Notifications ----
+
+@router.post("/test/telegram")
+async def test_telegram_notification(request: Request, db: AsyncSession = Depends(get_db)):
+    if not request.user.is_authenticated:
+        return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
+    if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
+        raise HTTPException(status_code=403, detail="Operators/Admins only")
+    
+    try:
+        from app.monitor import dispatch_notifications
+        
+        test_message = f"Тестовое уведомление от пользователя {request.session.get('username')}"
+        await dispatch_notifications(test_message)
+        
+        return JSONResponse({"status": "success", "message": "Тестовое уведомление отправлено"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": f"Ошибка отправки: {str(e)}"}, status_code=500)
+

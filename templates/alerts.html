@@ -6,6 +6,7 @@
     <div class="page-actions">
       <a href="/alert-groups" class="btn btn-secondary">📁 Группы алертов</a>
       <a href="/reports/export.pdf?report_type=alerts" class="btn btn-secondary">📄 Экспорт PDF</a>
+      <button class="btn btn-secondary" onclick="testTelegram()">🤖 Тест Telegram</button>
       <button class="btn btn-secondary" onclick="location.reload()">🔄 Обновить</button>
     </div>
   </div>
@@ -169,6 +170,29 @@
       </tbody>
     </table>
   </div>
+
+  <script>
+    async function testTelegram() {
+      try {
+        const response = await fetch('/test/telegram', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+          showNotification('✅ Тестовое уведомление отправлено в Telegram!', 'success');
+        } else {
+          showNotification('❌ Ошибка отправки: ' + result.message, 'error');
+        }
+      } catch (error) {
+        showNotification('❌ Ошибка: ' + error.message, 'error');
+      }
+    }
+  </script>
 {% endblock %}
 
 
