@@ -211,7 +211,15 @@
           try {
             const hist = await fetchMetrics(s.id);
             if (hist && hist.length > 0) {
-              const labels = hist.map(h => new Date(h.timestamp).toLocaleTimeString());
+              const labels = hist.map(h => {
+                const date = new Date(h.timestamp);
+                const moscowTime = new Date(date.getTime() + (3 * 60 * 60 * 1000)); // Add 3 hours
+                return moscowTime.toLocaleTimeString('ru-RU', { 
+                  hour: '2-digit', 
+                  minute: '2-digit',
+                  timeZone: 'Europe/Moscow'
+                });
+              });
               const cpu = hist.map(h => h.cpu_percent);
               const canvas = document.getElementById(`cpuChart-${s.id}`);
               if (canvas) upsertChart(canvas, labels, cpu);

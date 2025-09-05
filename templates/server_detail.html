@@ -205,9 +205,13 @@
 
         const labels = hist.map(h => {
           try {
-            return new Date(h.timestamp).toLocaleTimeString('ru-RU', { 
+            // Convert to Moscow timezone (UTC+3)
+            const date = new Date(h.timestamp);
+            const moscowTime = new Date(date.getTime() + (3 * 60 * 60 * 1000)); // Add 3 hours
+            return moscowTime.toLocaleTimeString('ru-RU', { 
               hour: '2-digit', 
-              minute: '2-digit' 
+              minute: '2-digit',
+              timeZone: 'Europe/Moscow'
             });
           } catch (e) {
             return 'Invalid time';
