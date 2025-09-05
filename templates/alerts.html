@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from datetime import timedelta %}
 {% block title %}Алерты • Server Check{% endblock %}
 {% block content %}
   <div class="page-header">
@@ -115,7 +114,7 @@
         {% for e in events %}
         <tr>
           <td>
-            <span class="timestamp">{{ (e.timestamp + timedelta(hours=3)).strftime('%d.%m.%Y %H:%M:%S') if e.timestamp else '—' }}</span>
+            <span class="timestamp">{{ format_moscow_time(e.timestamp) }}</span>
           </td>
           <td>{{ e.rule_id }}</td>
           <td>{{ e.server_id }}</td>

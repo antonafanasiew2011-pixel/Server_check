@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% from datetime import timedelta %}
 {% block title %}Аудит • Server Check{% endblock %}
 {% block content %}
   <div class="page-header">
@@ -23,7 +22,7 @@
         {% for l in logs %}
         <tr>
           <td>
-            <span class="timestamp">{{ (l.timestamp + timedelta(hours=3)).strftime('%d.%m.%Y %H:%M:%S') if l.timestamp else '—' }}</span>
+            <span class="timestamp">{{ format_moscow_time(l.timestamp) }}</span>
           </td>
           <td>
             <strong>{{ l.username or '—' }}</strong>

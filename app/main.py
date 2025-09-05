@@ -69,6 +69,8 @@ async def on_startup():
             await conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN snmp_community VARCHAR(200)")
         if "metric_source" not in cols2:
             await conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN metric_source VARCHAR(20) DEFAULT 'auto'")
+        if "environment" not in cols2:
+            await conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN environment VARCHAR(20) DEFAULT 'prod'")
 
     # Ensure default admin exists for local login
     async with AsyncSessionLocal() as db:

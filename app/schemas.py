@@ -21,6 +21,7 @@ class ServerCreate(BaseModel):
     system_name: Optional[str] = None
     owner: Optional[str] = None
     is_cluster: bool = False
+    environment: str = "prod"  # test|stage|prod
 
 
 class ServerUpdate(ServerCreate):

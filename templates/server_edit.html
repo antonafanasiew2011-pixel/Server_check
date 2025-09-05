@@ -7,6 +7,11 @@
     <input name="ip_address" value="{{ s.ip_address }}" placeholder="IP" required />
     <input name="system_name" value="{{ s.system_name or '' }}" placeholder="Система" />
     <input name="owner" value="{{ s.owner or '' }}" placeholder="Ответственный" />
+    <select name="environment" required>
+      <option value="prod" {% if s.environment=='prod' %}selected{% endif %}>🏭 Prod</option>
+      <option value="stage" {% if s.environment=='stage' %}selected{% endif %}>🚀 Stage</option>
+      <option value="test" {% if s.environment=='test' %}selected{% endif %}>🧪 Test</option>
+    </select>
     <input name="tags" value="{{ s.tags or '' }}" placeholder="Теги (через запятую)" />
     <div>
       <label><input type="checkbox" name="is_cluster" value="true" {% if s.is_cluster %}checked{% endif %}/> Кластер</label>

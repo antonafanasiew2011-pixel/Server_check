@@ -144,6 +144,7 @@ async def list_servers(
     q: str | None = None,
     cluster: str | None = None,  # 'yes' | 'no' | None
     reachable: str | None = None,  # 'yes' | 'no' | None
+    environment: str | None = None,  # 'test' | 'stage' | 'prod' | None
     sort: str | None = None,  # hostname|ip|reachable|cpu|ram
     tag: str | None = None,
     page: int = Query(1, ge=1),
@@ -171,6 +172,8 @@ async def list_servers(
     if reachable in {"yes", "no"}:
         want = reachable == "yes"
         enriched = [e for e in enriched if (e[1].reachable if e[1] is not None else False) == want]
+    if environment in {"test", "stage", "prod"}:
+        enriched = [e for e in enriched if e[0].environment == environment]
     if tag:
         t = tag.lower()
         enriched = [e for e in enriched if (e[0].tags and t in e[0].tags.lower())]
@@ -230,7 +233,7 @@ async def list_servers(
             "request": request,
             "servers": [e[0] for e in paginated_enriched],
             "latest_map": {e[0].id: e[1] for e in paginated_enriched},
-            "params": {"q": q or "", "cluster": cluster or "", "reachable": reachable or "", "sort": sort or "", "tag": tag or ""},
+            "params": {"q": q or "", "cluster": cluster or "", "reachable": reachable or "", "environment": environment or "", "sort": sort or "", "tag": tag or ""},
             "is_admin": is_admin,
             "pagination": pagination,
         },
@@ -238,7 +241,7 @@ async def list_servers(
 
 
 @router.post("/servers")
-async def create_server(request: Request, db: AsyncSession = Depends(get_db), hostname: str = Form(...), ip_address: str = Form(...), system_name: str = Form(None), owner: str = Form(None), is_cluster: bool = Form(False), tags: str = Form(None), ssh_host: str = Form(None), ssh_port: int = Form(22), ssh_username: str = Form(None), ssh_password: str = Form(None), snmp_version: str = Form(None), snmp_community: str = Form(None)):
+async def create_server(request: Request, db: AsyncSession = Depends(get_db), hostname: str = Form(...), ip_address: str = Form(...), system_name: str = Form(None), owner: str = Form(None), is_cluster: bool = Form(False), environment: str = Form("prod"), tags: str = Form(None), ssh_host: str = Form(None), ssh_port: int = Form(22), ssh_username: str = Form(None), ssh_password: str = Form(None), snmp_version: str = Form(None), snmp_community: str = Form(None)):
     if not request.user.is_authenticated:
         return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
     if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
@@ -247,7 +250,7 @@ async def create_server(request: Request, db: AsyncSession = Depends(get_db), ho
     encrypted_ssh_password = encrypt_password(ssh_password) if ssh_password else None
     encrypted_snmp_community = encrypt_password(snmp_community) if snmp_community else None
     
-    server = Server(hostname=hostname, ip_address=ip_address, system_name=system_name, owner=owner, is_cluster=is_cluster, tags=tags, ssh_host=ssh_host, ssh_port=ssh_port, ssh_username=ssh_username, ssh_password=encrypted_ssh_password, snmp_version=snmp_version, snmp_community=encrypted_snmp_community)
+    server = Server(hostname=hostname, ip_address=ip_address, system_name=system_name, owner=owner, is_cluster=is_cluster, environment=environment, tags=tags, ssh_host=ssh_host, ssh_port=ssh_port, ssh_username=ssh_username, ssh_password=encrypted_ssh_password, snmp_version=snmp_version, snmp_community=encrypted_snmp_community)
     db.add(server)
     await db.commit()
     db.add(AuditLog(username=request.session.get("username"), action="server_create", details=f"{hostname} {ip_address}"))
@@ -293,7 +296,7 @@ async def edit_server_page(request: Request, server_id: int, db: AsyncSession = 
 @router.post("/servers/{server_id}/edit")
 async def edit_server(request: Request, server_id: int, db: AsyncSession = Depends(get_db),
                       hostname: str = Form(...), ip_address: str = Form(...), system_name: str = Form(None),
-                      owner: str = Form(None), is_cluster: bool = Form(False), tags: str = Form(None),
+                      owner: str = Form(None), is_cluster: bool = Form(False), environment: str = Form("prod"), tags: str = Form(None),
                       ssh_host: str = Form(None), ssh_port: int = Form(22), ssh_username: str = Form(None), ssh_password: str = Form(None),
                       snmp_version: str = Form(None), snmp_community: str = Form(None), metric_source: str = Form("auto")):
     if not request.user.is_authenticated:
@@ -308,6 +311,7 @@ async def edit_server(request: Request, server_id: int, db: AsyncSession = Depen
     server.system_name = system_name
     server.owner = owner
     server.is_cluster = is_cluster
+    server.environment = environment
     server.tags = tags
     server.ssh_host = ssh_host
     server.ssh_port = ssh_port
@@ -360,7 +364,7 @@ async def audit_page(request: Request, db: AsyncSession = Depends(get_db)):
     if request.session.get("role") not in {UserRole.admin.value}:
         raise HTTPException(status_code=403, detail="Admins only")
     logs = (await db.execute(select(AuditLog).order_by(AuditLog.timestamp.desc()).limit(200))).scalars().all()
-    return request.app.state.templates.TemplateResponse("audit.html", {"request": request, "logs": logs})
+    return request.app.state.templates.TemplateResponse("audit.html", {"request": request, "logs": logs, "format_moscow_time": format_moscow_time})
 
 
 @router.post("/users")
@@ -501,7 +505,7 @@ async def alerts_page(request: Request, db: AsyncSession = Depends(get_db)):
     rules = (await db.execute(select(AlertRule))).scalars().all()
     events = (await db.execute(select(AlertEvent).order_by(AlertEvent.timestamp.desc()).limit(50))).scalars().all()
     servers = (await db.execute(select(Server))).scalars().all()
-    return request.app.state.templates.TemplateResponse("alerts.html", {"request": request, "rules": rules, "events": events, "servers": servers})
+    return request.app.state.templates.TemplateResponse("alerts.html", {"request": request, "rules": rules, "events": events, "servers": servers, "format_moscow_time": format_moscow_time})
 
 
 @router.post("/alerts")

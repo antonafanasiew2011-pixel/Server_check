@@ -37,6 +37,14 @@
           </select>
         </div>
         <div class="form-group">
+          <select name="environment" class="form-control">
+            <option value="">Все среды</option>
+            <option value="test" {% if params.environment=='test' %}selected{% endif %}>🧪 Test</option>
+            <option value="stage" {% if params.environment=='stage' %}selected{% endif %}>🚀 Stage</option>
+            <option value="prod" {% if params.environment=='prod' %}selected{% endif %}>🏭 Prod</option>
+          </select>
+        </div>
+        <div class="form-group">
           <select name="sort" class="form-control">
             <option value="">Сортировка</option>
             <option value="hostname" {% if params.sort=='hostname' %}selected{% endif %}>Hostname</option>
@@ -66,6 +74,11 @@
       <input name="ip_address" placeholder="IP" required />
       <input name="system_name" placeholder="Система" />
       <input name="owner" placeholder="Ответственный" />
+      <select name="environment" required>
+        <option value="prod">🏭 Prod</option>
+        <option value="stage">🚀 Stage</option>
+        <option value="test">🧪 Test</option>
+      </select>
       <input name="tags" placeholder="Теги (через запятую)" />
       <input name="ssh_host" placeholder="SSH host (опц.)" />
       <input name="ssh_port" placeholder="port" value="22" style="width:80px;" />
@@ -88,6 +101,7 @@
           <th>Система</th>
           <th>Ответственный</th>
           <th>Кластер</th>
+          <th>Среда</th>
           <th>Теги</th>
           <th class="sortable" data-sort="reachable">Статус</th>
           <th class="sortable" data-sort="cpu">CPU</th>
@@ -116,6 +130,17 @@
               <span class="status-badge status-online">Да</span>
             {% else %}
               <span class="status-badge status-unknown">Нет</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.environment == 'test' %}
+              <span class="environment-badge environment-test">🧪 Test</span>
+            {% elif s.environment == 'stage' %}
+              <span class="environment-badge environment-stage">🚀 Stage</span>
+            {% elif s.environment == 'prod' %}
+              <span class="environment-badge environment-prod">🏭 Prod</span>
+            {% else %}
+              <span class="environment-badge environment-unknown">❓ {{ s.environment or 'Unknown' }}</span>
             {% endif %}
           </td>
           <td>

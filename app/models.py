@@ -36,6 +36,7 @@ class Server(Base):
     system_name = Column(String(200), nullable=True)
     owner = Column(String(200), nullable=True)
     is_cluster = Column(Boolean, default=False)
+    environment = Column(String(20), default="prod")  # test|stage|prod
     tags = Column(String(500), nullable=True)
     # Remote collection settings
     ssh_host = Column(String(200), nullable=True)
