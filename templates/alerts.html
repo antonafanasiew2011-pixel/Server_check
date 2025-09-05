@@ -4,6 +4,8 @@
   <div class="page-header">
     <h1>Управление алертами</h1>
     <div class="page-actions">
+      <a href="/alert-groups" class="btn btn-secondary">📁 Группы алертов</a>
+      <a href="/reports/export.pdf?report_type=alerts" class="btn btn-secondary">📄 Экспорт PDF</a>
       <button class="btn btn-secondary" onclick="location.reload()">🔄 Обновить</button>
     </div>
   </div>
@@ -25,11 +27,23 @@
           </select>
         </div>
         <div class="form-group">
+          <label class="form-label">Группа (опционально)</label>
+          <select name="group_id" class="form-control">
+            <option value="">Без группы</option>
+            {% for group in groups %}
+            <option value="{{ group.id }}">{{ group.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
           <label class="form-label">Метрика</label>
           <select name="metric" class="form-control" required>
             <option value="cpu">CPU %</option>
+            <option value="cpu_temp">CPU Temperature °C</option>
             <option value="ram">RAM %</option>
+            <option value="swap">Swap %</option>
             <option value="disk">Disk %</option>
+            <option value="disk_io">Disk I/O MB/s</option>
             <option value="processes">Processes</option>
             <option value="net_in">Net In Kbps</option>
             <option value="net_out">Net Out Kbps</option>
@@ -48,6 +62,14 @@
           <label class="form-label">Пороговое значение</label>
           <input name="threshold" class="form-control" placeholder="Введите значение" required />
         </div>
+        <div class="form-group">
+          <label class="form-label">Серьезность</label>
+          <select name="severity" class="form-control" required>
+            <option value="info">ℹ️ Информация</option>
+            <option value="warning" selected>⚠️ Предупреждение</option>
+            <option value="critical">🚨 Критично</option>
+          </select>
+        </div>
       </div>
       <button type="submit" class="btn btn-primary">Создать правило</button>
     </form>
@@ -61,7 +83,9 @@
           <th>ID</th>
           <th>Название</th>
           <th>Сервер</th>
+          <th>Группа</th>
           <th>Условие</th>
+          <th>Серьезность</th>
           <th>Статус</th>
           <th>Действия</th>
         </tr>
@@ -73,7 +97,23 @@
           <td><strong>{{ r.name }}</strong></td>
           <td>{{ r.server_id }}</td>
           <td>
+            {% if r.group %}
+              <span class="group-badge">{{ r.group.name }}</span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
             <code>{{ r.metric }} {{ r.operator }} {{ r.threshold }}</code>
+          </td>
+          <td>
+            {% if r.severity == 'critical' %}
+              <span class="severity-badge severity-critical">🚨 Критично</span>
+            {% elif r.severity == 'warning' %}
+              <span class="severity-badge severity-warning">⚠️ Предупреждение</span>
+            {% else %}
+              <span class="severity-badge severity-info">ℹ️ Информация</span>
+            {% endif %}
           </td>
           <td>
             <span class="status-badge {{ 'status-online' if r.enabled else 'status-offline' }}">

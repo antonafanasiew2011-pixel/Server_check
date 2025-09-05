@@ -1,4 +1,6 @@
 import asyncio
+import time
+from datetime import datetime
 from typing import Dict, Tuple
 import psutil
 from pythonping import ping
@@ -13,23 +15,54 @@ from email.message import EmailMessage
 import httpx
 
 
-async def collect_local_metrics() -> Tuple[float, float, float, int, float, float]:
+async def collect_local_metrics() -> Tuple[float, float, float, float, float, float, int, float, float, float, float]:
     cpu = psutil.cpu_percent(interval=0.5)
     ram = psutil.virtual_memory().percent
+    swap = psutil.swap_memory().percent
     disk = psutil.disk_usage('/').percent
     processes = len(psutil.pids())
+    
+    # Network I/O
     net_io_1 = psutil.net_io_counters()
     await asyncio.sleep(1)
     net_io_2 = psutil.net_io_counters()
     in_kbps = (net_io_2.bytes_recv - net_io_1.bytes_recv) * 8 / 1024
     out_kbps = (net_io_2.bytes_sent - net_io_1.bytes_sent) * 8 / 1024
-    return cpu, ram, disk, processes, in_kbps, out_kbps
+    
+    # Disk I/O
+    disk_io_1 = psutil.disk_io_counters()
+    await asyncio.sleep(1)
+    disk_io_2 = psutil.disk_io_counters()
+    disk_read_mb = (disk_io_2.read_bytes - disk_io_1.read_bytes) / (1024 * 1024)
+    disk_write_mb = (disk_io_2.write_bytes - disk_io_1.write_bytes) / (1024 * 1024)
+    
+    # CPU Temperature (Linux only)
+    cpu_temp = None
+    try:
+        if hasattr(psutil, "sensors_temperatures"):
+            temps = psutil.sensors_temperatures()
+            if temps:
+                for name, entries in temps.items():
+                    if 'core' in name.lower() or 'cpu' in name.lower():
+                        for entry in entries:
+                            if entry.current is not None:
+                                cpu_temp = entry.current
+                                break
+                        if cpu_temp is not None:
+                            break
+    except Exception:
+        pass
+    
+    return cpu, cpu_temp, ram, swap, disk, disk_read_mb, disk_write_mb, processes, in_kbps, out_kbps
 
 
 async def _probe_server(server: Server):
     reachable = False
-    cpu = ram = disk = in_kbps = out_kbps = None
+    cpu = cpu_temp = ram = swap = disk = disk_read = disk_write = in_kbps = out_kbps = None
     processes = None
+    services_status = None
+    ports_status = None
+    
     try:
         resp = ping(server.ip_address, count=1, timeout=settings.ping_timeout_seconds)
         reachable = resp.success()
@@ -43,7 +76,47 @@ async def _probe_server(server: Server):
     # Local metrics if localhost (or forced local)
     if (source == "local" and is_local) or (source == "auto" and is_local):
         try:
-            cpu, ram, disk, processes, in_kbps, out_kbps = await collect_local_metrics()
+            cpu, cpu_temp, ram, swap, disk, disk_read, disk_write, processes, in_kbps, out_kbps = await collect_local_metrics()
+            
+            # Check services status
+            if server.services_to_monitor:
+                try:
+                    import json
+                    services_list = json.loads(server.services_to_monitor)
+                    services_status = {}
+                    for service in services_list:
+                        try:
+                            # Check if service is running (Linux)
+                            import subprocess
+                            result = subprocess.run(['systemctl', 'is-active', service], 
+                                                  capture_output=True, text=True, timeout=5)
+                            services_status[service] = result.stdout.strip() == 'active'
+                        except Exception:
+                            services_status[service] = False
+                    services_status = json.dumps(services_status)
+                except Exception:
+                    pass
+            
+            # Check ports status
+            if server.ports_to_monitor:
+                try:
+                    import json
+                    import socket
+                    ports_list = json.loads(server.ports_to_monitor)
+                    ports_status = {}
+                    for port in ports_list:
+                        try:
+                            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            sock.settimeout(2)
+                            result = sock.connect_ex(('127.0.0.1', int(port)))
+                            ports_status[str(port)] = result == 0
+                            sock.close()
+                        except Exception:
+                            ports_status[str(port)] = False
+                    ports_status = json.dumps(ports_status)
+                except Exception:
+                    pass
+                    
         except Exception:
             pass
     # SSH metrics (forced or auto when ssh configured)
@@ -190,12 +263,18 @@ async def _probe_server(server: Server):
     return {
         "server_id": server.id,
         "cpu": cpu,
+        "cpu_temp": cpu_temp,
         "ram": ram,
+        "swap": swap,
         "disk": disk,
+        "disk_read": disk_read,
+        "disk_write": disk_write,
         "processes": processes,
         "in_kbps": in_kbps,
         "out_kbps": out_kbps,
         "reachable": reachable,
+        "services_status": services_status,
+        "ports_status": ports_status,
     }
 
 
@@ -212,12 +291,18 @@ async def monitor_once(db: AsyncSession):
         metric = Metric(
             server_id=r["server_id"],
             cpu_percent=r["cpu"],
+            cpu_temp=r["cpu_temp"],
             ram_percent=r["ram"],
+            swap_percent=r["swap"],
             disk_percent=r["disk"],
+            disk_io_read=r["disk_read"],
+            disk_io_write=r["disk_write"],
             processes=r["processes"],
             network_in_kbps=r["in_kbps"],
             network_out_kbps=r["out_kbps"],
             reachable=r["reachable"],
+            services_status=r["services_status"],
+            ports_status=r["ports_status"],
         )
         db.add(metric)
     await db.commit()
@@ -260,12 +345,13 @@ async def retention_job(db_factory):
 
 async def dispatch_notifications(message: str):
     # Email
-    if settings.smtp_host and settings.smtp_from:
+    smtp_from = settings.smtp_from or settings.smtp_from_email
+    if settings.smtp_host and smtp_from:
         try:
             msg = EmailMessage()
             msg["Subject"] = "Server Check Alert"
-            msg["From"] = settings.smtp_from
-            msg["To"] = settings.smtp_from
+            msg["From"] = smtp_from
+            msg["To"] = smtp_from
             msg.set_content(message)
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as s:
                 if settings.smtp_use_tls:
@@ -275,6 +361,7 @@ async def dispatch_notifications(message: str):
                 s.send_message(msg)
         except Exception:
             pass
+    
     # Telegram
     if settings.telegram_bot_token and settings.telegram_chat_id:
         try:
@@ -283,11 +370,55 @@ async def dispatch_notifications(message: str):
                 await client.post(url, json={"chat_id": settings.telegram_chat_id, "text": message})
         except Exception:
             pass
+    
+    # Slack
+    if settings.slack_webhook_url:
+        try:
+            payload = {
+                "text": f"🚨 Server Check Alert",
+                "attachments": [
+                    {
+                        "color": "danger",
+                        "text": message,
+                        "footer": "Server Check",
+                        "ts": int(time.time())
+                    }
+                ]
+            }
+            if settings.slack_channel:
+                payload["channel"] = settings.slack_channel
+            
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(settings.slack_webhook_url, json=payload)
+        except Exception:
+            pass
+    
+    # Discord
+    if settings.discord_webhook_url:
+        try:
+            payload = {
+                "content": f"🚨 **Server Check Alert**",
+                "embeds": [
+                    {
+                        "title": "Alert Notification",
+                        "description": message,
+                        "color": 15158332,  # Red color
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "footer": {"text": "Server Check"}
+                    }
+                ]
+            }
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(settings.discord_webhook_url, json=payload)
+        except Exception:
+            pass
+    
     # Webhook
-    if settings.default_webhook_url:
+    webhook_url = settings.default_webhook_url or settings.webhook_url
+    if webhook_url:
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                await client.post(settings.default_webhook_url, json={"message": message})
+                await client.post(webhook_url, json={"message": message})
         except Exception:
             pass
 

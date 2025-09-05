@@ -53,12 +53,18 @@ class MonitoringService:
                 "latest_metric": {
                     "timestamp": metric.timestamp.isoformat() if metric and metric.timestamp else None,
                     "cpu_percent": metric.cpu_percent if metric else None,
+                    "cpu_temp": metric.cpu_temp if metric else None,
                     "ram_percent": metric.ram_percent if metric else None,
+                    "swap_percent": metric.swap_percent if metric else None,
                     "disk_percent": metric.disk_percent if metric else None,
+                    "disk_io_read": metric.disk_io_read if metric else None,
+                    "disk_io_write": metric.disk_io_write if metric else None,
                     "processes": metric.processes if metric else None,
                     "network_in_kbps": metric.network_in_kbps if metric else None,
                     "network_out_kbps": metric.network_out_kbps if metric else None,
                     "reachable": metric.reachable if metric else None,
+                    "services_status": metric.services_status if metric else None,
+                    "ports_status": metric.ports_status if metric else None,
                 } if metric else None
             }
             servers_data.append(server_data)
@@ -92,12 +98,18 @@ class MonitoringService:
             {
                 "timestamp": m.timestamp.isoformat(),
                 "cpu_percent": m.cpu_percent,
+                "cpu_temp": m.cpu_temp,
                 "ram_percent": m.ram_percent,
+                "swap_percent": m.swap_percent,
                 "disk_percent": m.disk_percent,
+                "disk_io_read": m.disk_io_read,
+                "disk_io_write": m.disk_io_write,
                 "processes": m.processes,
                 "network_in_kbps": m.network_in_kbps,
                 "network_out_kbps": m.network_out_kbps,
                 "reachable": m.reachable,
+                "services_status": m.services_status,
+                "ports_status": m.ports_status,
             }
             for m in metrics
         ]
@@ -154,8 +166,11 @@ class MonitoringService:
             # Map metric values
             metric_map = {
                 "cpu": metric.cpu_percent,
+                "cpu_temp": metric.cpu_temp,
                 "ram": metric.ram_percent,
+                "swap": metric.swap_percent,
                 "disk": metric.disk_percent,
+                "disk_io": (metric.disk_io_read or 0) + (metric.disk_io_write or 0),  # Combined disk I/O
                 "processes": float(metric.processes) if metric.processes is not None else None,
                 "net_in": metric.network_in_kbps,
                 "net_out": metric.network_out_kbps,

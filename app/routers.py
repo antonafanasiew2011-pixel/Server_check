@@ -6,7 +6,7 @@ from sqlalchemy import select, delete
 from starlette.status import HTTP_302_FOUND
 from app.database import get_db
 from app.models import User, Server, Metric, UserRole, AuditLog
-from app.models import AlertRule, AlertEvent
+from app.models import AlertRule, AlertEvent, AlertGroup
 from app.schemas import ServerCreate, ServerUpdate
 from app.security import verify_password, hash_password
 from app.ldap_utils import ldap_authenticate
@@ -241,16 +241,28 @@ async def list_servers(
 
 
 @router.post("/servers")
-async def create_server(request: Request, db: AsyncSession = Depends(get_db), hostname: str = Form(...), ip_address: str = Form(...), system_name: str = Form(None), owner: str = Form(None), is_cluster: bool = Form(False), environment: str = Form("prod"), tags: str = Form(None), ssh_host: str = Form(None), ssh_port: int = Form(22), ssh_username: str = Form(None), ssh_password: str = Form(None), snmp_version: str = Form(None), snmp_community: str = Form(None)):
+async def create_server(request: Request, db: AsyncSession = Depends(get_db), hostname: str = Form(...), ip_address: str = Form(...), system_name: str = Form(""), owner: str = Form(""), is_cluster: bool = Form(False), environment: str = Form("prod"), tags: str = Form(""), ssh_host: str = Form(""), ssh_port: int = Form(22), ssh_username: str = Form(""), ssh_password: str = Form(""), snmp_version: str = Form(""), snmp_community: str = Form(""), services_to_monitor: str = Form(""), ports_to_monitor: str = Form("")):
     if not request.user.is_authenticated:
         return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
     if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
         raise HTTPException(status_code=403, detail="Admins only")
-    # Encrypt sensitive data
-    encrypted_ssh_password = encrypt_password(ssh_password) if ssh_password else None
-    encrypted_snmp_community = encrypt_password(snmp_community) if snmp_community else None
     
-    server = Server(hostname=hostname, ip_address=ip_address, system_name=system_name, owner=owner, is_cluster=is_cluster, environment=environment, tags=tags, ssh_host=ssh_host, ssh_port=ssh_port, ssh_username=ssh_username, ssh_password=encrypted_ssh_password, snmp_version=snmp_version, snmp_community=encrypted_snmp_community)
+    # Convert empty strings to None for optional fields
+    def clean_string(value):
+        return value.strip() if value and value.strip() else None
+    
+    system_name = clean_string(system_name)
+    owner = clean_string(owner)
+    tags = clean_string(tags)
+    ssh_host = clean_string(ssh_host)
+    ssh_username = clean_string(ssh_username)
+    snmp_version = clean_string(snmp_version)
+    
+    # Encrypt sensitive data
+    encrypted_ssh_password = encrypt_password(ssh_password) if ssh_password and ssh_password.strip() else None
+    encrypted_snmp_community = encrypt_password(snmp_community) if snmp_community and snmp_community.strip() else None
+    
+    server = Server(hostname=hostname, ip_address=ip_address, system_name=system_name, owner=owner, is_cluster=is_cluster, environment=environment, tags=tags, ssh_host=ssh_host, ssh_port=ssh_port, ssh_username=ssh_username, ssh_password=encrypted_ssh_password, snmp_version=snmp_version, snmp_community=encrypted_snmp_community, services_to_monitor=clean_string(services_to_monitor), ports_to_monitor=clean_string(ports_to_monitor))
     db.add(server)
     await db.commit()
     db.add(AuditLog(username=request.session.get("username"), action="server_create", details=f"{hostname} {ip_address}"))
@@ -295,10 +307,10 @@ async def edit_server_page(request: Request, server_id: int, db: AsyncSession = 
 
 @router.post("/servers/{server_id}/edit")
 async def edit_server(request: Request, server_id: int, db: AsyncSession = Depends(get_db),
-                      hostname: str = Form(...), ip_address: str = Form(...), system_name: str = Form(None),
-                      owner: str = Form(None), is_cluster: bool = Form(False), environment: str = Form("prod"), tags: str = Form(None),
-                      ssh_host: str = Form(None), ssh_port: int = Form(22), ssh_username: str = Form(None), ssh_password: str = Form(None),
-                      snmp_version: str = Form(None), snmp_community: str = Form(None), metric_source: str = Form("auto")):
+                      hostname: str = Form(...), ip_address: str = Form(...), system_name: str = Form(""),
+                      owner: str = Form(""), is_cluster: bool = Form(False), environment: str = Form("prod"), tags: str = Form(""),
+                      ssh_host: str = Form(""), ssh_port: int = Form(22), ssh_username: str = Form(""), ssh_password: str = Form(""),
+                      snmp_version: str = Form(""), snmp_community: str = Form(""), services_to_monitor: str = Form(""), ports_to_monitor: str = Form(""), metric_source: str = Form("auto")):
     if not request.user.is_authenticated:
         return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
     if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
@@ -306,22 +318,29 @@ async def edit_server(request: Request, server_id: int, db: AsyncSession = Depen
     server = (await db.execute(select(Server).where(Server.id == server_id))).scalar_one_or_none()
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
+    
+    # Convert empty strings to None for optional fields
+    def clean_string(value):
+        return value.strip() if value and value.strip() else None
+    
     server.hostname = hostname
     server.ip_address = ip_address
-    server.system_name = system_name
-    server.owner = owner
+    server.system_name = clean_string(system_name)
+    server.owner = clean_string(owner)
     server.is_cluster = is_cluster
     server.environment = environment
-    server.tags = tags
-    server.ssh_host = ssh_host
+    server.tags = clean_string(tags)
+    server.ssh_host = clean_string(ssh_host)
     server.ssh_port = ssh_port
-    server.ssh_username = ssh_username
+    server.ssh_username = clean_string(ssh_username)
+    server.services_to_monitor = clean_string(services_to_monitor)
+    server.ports_to_monitor = clean_string(ports_to_monitor)
     # Only update password if provided (don't overwrite with empty)
-    if ssh_password:
+    if ssh_password and ssh_password.strip():
         server.ssh_password = encrypt_password(ssh_password)
-    server.snmp_version = snmp_version
+    server.snmp_version = clean_string(snmp_version)
     # Only update community if provided (don't overwrite with empty)
-    if snmp_community:
+    if snmp_community and snmp_community.strip():
         server.snmp_community = encrypt_password(snmp_community)
     server.metric_source = metric_source
     await db.commit()
@@ -368,7 +387,7 @@ async def audit_page(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/users")
-async def create_user(request: Request, db: AsyncSession = Depends(get_db), username: str = Form(...), password: str = Form(...), full_name: str = Form(None), role: str = Form(UserRole.user.value)):
+async def create_user(request: Request, db: AsyncSession = Depends(get_db), username: str = Form(...), password: str = Form(...), full_name: str = Form(""), role: str = Form(UserRole.user.value)):
     if not request.user.is_authenticated:
         return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
     if request.session.get("role") != UserRole.admin.value:
@@ -377,7 +396,11 @@ async def create_user(request: Request, db: AsyncSession = Depends(get_db), user
     if exists:
         users = (await db.execute(select(User))).scalars().all()
         return request.app.state.templates.TemplateResponse("users.html", {"request": request, "users": users, "roles": [UserRole.admin.value, UserRole.user.value], "error": "Пользователь уже существует"})
-    user = User(username=username, full_name=full_name, password_hash=hash_password(password), role=role, is_ldap=False)
+    
+    # Convert empty string to None for full_name
+    parsed_full_name = full_name.strip() if full_name and full_name.strip() else None
+    
+    user = User(username=username, full_name=parsed_full_name, password_hash=hash_password(password), role=role, is_ldap=False)
     db.add(user)
     await db.commit()
     return RedirectResponse(url="/users", status_code=HTTP_302_FOUND)
@@ -403,6 +426,14 @@ async def prometheus_metrics(db: AsyncSession = Depends(get_db)):
     lines.append("# TYPE server_net_in_kbps gauge")
     lines.append("# HELP server_net_out_kbps Network output kbps (localhost)")
     lines.append("# TYPE server_net_out_kbps gauge")
+    lines.append("# HELP server_cpu_temp CPU temperature in Celsius")
+    lines.append("# TYPE server_cpu_temp gauge")
+    lines.append("# HELP server_swap_percent Swap usage percent")
+    lines.append("# TYPE server_swap_percent gauge")
+    lines.append("# HELP server_disk_io_read Disk I/O read MB/s")
+    lines.append("# TYPE server_disk_io_read gauge")
+    lines.append("# HELP server_disk_io_write Disk I/O write MB/s")
+    lines.append("# TYPE server_disk_io_write gauge")
 
     for s in servers:
         latest = (await db.execute(select(Metric).where(Metric.server_id == s.id).order_by(Metric.timestamp.desc()).limit(1))).scalar_one_or_none()
@@ -425,6 +456,14 @@ async def prometheus_metrics(db: AsyncSession = Depends(get_db)):
             lines.append(f"server_net_in_kbps{{{labels}}} {latest.network_in_kbps}")
         if latest.network_out_kbps is not None:
             lines.append(f"server_net_out_kbps{{{labels}}} {latest.network_out_kbps}")
+        if latest.cpu_temp is not None:
+            lines.append(f"server_cpu_temp{{{labels}}} {latest.cpu_temp}")
+        if latest.swap_percent is not None:
+            lines.append(f"server_swap_percent{{{labels}}} {latest.swap_percent}")
+        if latest.disk_io_read is not None:
+            lines.append(f"server_disk_io_read{{{labels}}} {latest.disk_io_read}")
+        if latest.disk_io_write is not None:
+            lines.append(f"server_disk_io_write{{{labels}}} {latest.disk_io_write}")
 
     body = "\n".join(lines) + "\n"
     return Response(content=body, media_type="text/plain; version=0.0.4")
@@ -505,16 +544,26 @@ async def alerts_page(request: Request, db: AsyncSession = Depends(get_db)):
     rules = (await db.execute(select(AlertRule))).scalars().all()
     events = (await db.execute(select(AlertEvent).order_by(AlertEvent.timestamp.desc()).limit(50))).scalars().all()
     servers = (await db.execute(select(Server))).scalars().all()
-    return request.app.state.templates.TemplateResponse("alerts.html", {"request": request, "rules": rules, "events": events, "servers": servers, "format_moscow_time": format_moscow_time})
+    groups = (await db.execute(select(AlertGroup))).scalars().all()
+    return request.app.state.templates.TemplateResponse("alerts.html", {"request": request, "rules": rules, "events": events, "servers": servers, "groups": groups, "format_moscow_time": format_moscow_time})
 
 
 @router.post("/alerts")
-async def create_alert_rule(request: Request, db: AsyncSession = Depends(get_db), name: str = Form(...), server_id: int = Form(...), metric: str = Form(...), operator: str = Form(...), threshold: float = Form(None)):
+async def create_alert_rule(request: Request, db: AsyncSession = Depends(get_db), name: str = Form(...), server_id: int = Form(...), group_id: str = Form(""), metric: str = Form(...), operator: str = Form(...), threshold: float = Form(None), severity: str = Form("warning")):
     if not request.user.is_authenticated:
         return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
     if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
         raise HTTPException(status_code=403, detail="Operators/Admins only")
-    rule = AlertRule(name=name, server_id=server_id, metric=metric, operator=operator, threshold=threshold, enabled=True)
+    
+    # Parse group_id - convert empty string to None
+    parsed_group_id = None
+    if group_id and group_id.strip():
+        try:
+            parsed_group_id = int(group_id)
+        except ValueError:
+            parsed_group_id = None
+    
+    rule = AlertRule(name=name, server_id=server_id, group_id=parsed_group_id, metric=metric, operator=operator, threshold=threshold, severity=severity, enabled=True)
     db.add(rule)
     await db.commit()
     db.add(AuditLog(username=request.session.get("username"), action="alert_create", details=name))
@@ -642,4 +691,193 @@ async def set_user_password(request: Request, user_id: int, new_password: str = 
     user.password_hash = hash_password(new_password)
     await db.commit()
     return RedirectResponse(url="/users", status_code=HTTP_302_FOUND)
+
+
+# ---- Alert Groups Management ----
+
+@router.get("/alert-groups")
+async def alert_groups_page(request: Request, db: AsyncSession = Depends(get_db)):
+    if not request.user.is_authenticated:
+        return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
+    if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
+        raise HTTPException(status_code=403, detail="Operators/Admins only")
+    groups = (await db.execute(select(AlertGroup))).scalars().all()
+    return request.app.state.templates.TemplateResponse("alert_groups.html", {"request": request, "groups": groups})
+
+
+@router.post("/alert-groups")
+async def create_alert_group(request: Request, db: AsyncSession = Depends(get_db), name: str = Form(...), description: str = Form("")):
+    if not request.user.is_authenticated:
+        return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
+    if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
+        raise HTTPException(status_code=403, detail="Operators/Admins only")
+    
+    # Convert empty string to None for description
+    parsed_description = description.strip() if description and description.strip() else None
+    
+    group = AlertGroup(name=name, description=parsed_description, enabled=True)
+    db.add(group)
+    await db.commit()
+    db.add(AuditLog(username=request.session.get("username"), action="alert_group_create", details=name))
+    await db.commit()
+    return RedirectResponse(url="/alert-groups", status_code=HTTP_302_FOUND)
+
+
+@router.post("/alert-groups/{group_id}/delete")
+async def delete_alert_group(request: Request, group_id: int, db: AsyncSession = Depends(get_db)):
+    if not request.user.is_authenticated:
+        return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
+    if request.session.get("role") not in {UserRole.admin.value, UserRole.operator.value}:
+        raise HTTPException(status_code=403, detail="Operators/Admins only")
+    await db.execute(delete(AlertGroup).where(AlertGroup.id == group_id))
+    await db.commit()
+    db.add(AuditLog(username=request.session.get("username"), action="alert_group_delete", details=str(group_id)))
+    await db.commit()
+    return RedirectResponse(url="/alert-groups", status_code=HTTP_302_FOUND)
+
+
+# ---- PDF Export ----
+
+@router.get("/reports/export.pdf")
+async def export_report_pdf(request: Request, db: AsyncSession = Depends(get_db), 
+                          report_type: str = Query("servers", regex="^(servers|alerts|metrics)$"),
+                          server_id: int = Query(None)):
+    if not request.user.is_authenticated:
+        return RedirectResponse(url="/login", status_code=HTTP_302_FOUND)
+    
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        import io
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=30,
+            alignment=1  # Center alignment
+        )
+        story.append(Paragraph("Server Check Report", title_style))
+        story.append(Spacer(1, 12))
+        
+        if report_type == "servers":
+            # Servers report
+            servers = (await db.execute(select(Server))).scalars().all()
+            
+            # Create table data
+            data = [['Hostname', 'IP Address', 'System', 'Owner', 'Environment', 'Status']]
+            
+            for server in servers:
+                # Get latest metric
+                latest_metric = (await db.execute(
+                    select(Metric).where(Metric.server_id == server.id)
+                    .order_by(Metric.timestamp.desc()).limit(1)
+                )).scalar_one_or_none()
+                
+                status = "Unknown"
+                if latest_metric:
+                    status = "Online" if latest_metric.reachable else "Offline"
+                
+                data.append([
+                    server.hostname,
+                    server.ip_address,
+                    server.system_name or "—",
+                    server.owner or "—",
+                    server.environment,
+                    status
+                ])
+            
+            # Create table
+            table = Table(data)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 14),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(table)
+            
+        elif report_type == "alerts":
+            # Alerts report
+            rules = (await db.execute(select(AlertRule))).scalars().all()
+            events = (await db.execute(select(AlertEvent).order_by(AlertEvent.timestamp.desc()).limit(50))).scalars().all()
+            
+            # Rules table
+            story.append(Paragraph("Alert Rules", styles['Heading2']))
+            data = [['Name', 'Metric', 'Condition', 'Status']]
+            for rule in rules:
+                data.append([
+                    rule.name,
+                    rule.metric,
+                    f"{rule.operator} {rule.threshold}",
+                    "Enabled" if rule.enabled else "Disabled"
+                ])
+            
+            table = Table(data)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(table)
+            story.append(Spacer(1, 20))
+            
+            # Recent events
+            story.append(Paragraph("Recent Alert Events", styles['Heading2']))
+            data = [['Time', 'Rule ID', 'Server ID', 'Value', 'Message']]
+            for event in events:
+                data.append([
+                    event.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    str(event.rule_id),
+                    str(event.server_id),
+                    str(event.value) if event.value else "—",
+                    event.message[:50] + "..." if len(event.message) > 50 else event.message
+                ])
+            
+            table = Table(data)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(table)
+        
+        # Build PDF
+        doc.build(story)
+        buffer.seek(0)
+        
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=server_check_report_{report_type}.pdf"}
+        )
+        
+    except ImportError:
+        raise HTTPException(status_code=500, detail="PDF generation requires reportlab package. Install with: pip install reportlab")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
 

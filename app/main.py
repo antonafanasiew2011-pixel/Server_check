@@ -71,6 +71,34 @@ async def on_startup():
             await conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN metric_source VARCHAR(20) DEFAULT 'auto'")
         if "environment" not in cols2:
             await conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN environment VARCHAR(20) DEFAULT 'prod'")
+        if "services_to_monitor" not in cols2:
+            await conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN services_to_monitor VARCHAR(1000)")
+        if "ports_to_monitor" not in cols2:
+            await conn.exec_driver_sql("ALTER TABLE servers ADD COLUMN ports_to_monitor VARCHAR(1000)")
+        
+        # ensure metrics new columns exist
+        res3 = await conn.exec_driver_sql("PRAGMA table_info(metrics)")
+        cols3 = [row[1] for row in res3.fetchall()]
+        if "cpu_temp" not in cols3:
+            await conn.exec_driver_sql("ALTER TABLE metrics ADD COLUMN cpu_temp FLOAT")
+        if "swap_percent" not in cols3:
+            await conn.exec_driver_sql("ALTER TABLE metrics ADD COLUMN swap_percent FLOAT")
+        if "disk_io_read" not in cols3:
+            await conn.exec_driver_sql("ALTER TABLE metrics ADD COLUMN disk_io_read FLOAT")
+        if "disk_io_write" not in cols3:
+            await conn.exec_driver_sql("ALTER TABLE metrics ADD COLUMN disk_io_write FLOAT")
+        if "services_status" not in cols3:
+            await conn.exec_driver_sql("ALTER TABLE metrics ADD COLUMN services_status VARCHAR(1000)")
+        if "ports_status" not in cols3:
+            await conn.exec_driver_sql("ALTER TABLE metrics ADD COLUMN ports_status VARCHAR(1000)")
+        
+        # ensure alert_rules new columns exist
+        res4 = await conn.exec_driver_sql("PRAGMA table_info(alert_rules)")
+        cols4 = [row[1] for row in res4.fetchall()]
+        if "group_id" not in cols4:
+            await conn.exec_driver_sql("ALTER TABLE alert_rules ADD COLUMN group_id INTEGER")
+        if "severity" not in cols4:
+            await conn.exec_driver_sql("ALTER TABLE alert_rules ADD COLUMN severity VARCHAR(20) DEFAULT 'warning'")
 
     # Ensure default admin exists for local login
     async with AsyncSessionLocal() as db:

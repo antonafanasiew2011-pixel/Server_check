@@ -24,6 +24,14 @@
     <h3>SNMP</h3>
     <input name="snmp_version" value="{{ s.snmp_version or 'v2c' }}" placeholder="SNMP ver (v2c)" />
     <input name="snmp_community" value="{{ s.snmp_community or '' }}" placeholder="SNMP community" />
+    <h3>Мониторинг сервисов</h3>
+    <input name="services_to_monitor" value="{{ s.services_to_monitor or '' }}" placeholder='Сервисы (JSON): ["nginx", "mysql", "redis"]' />
+    <small style="color: #666; font-size: 12px;">Введите JSON массив названий сервисов для мониторинга через systemctl</small>
+    
+    <h3>Мониторинг портов</h3>
+    <input name="ports_to_monitor" value="{{ s.ports_to_monitor or '' }}" placeholder='Порты (JSON): ["80", "443", "3306"]' />
+    <small style="color: #666; font-size: 12px;">Введите JSON массив номеров портов для проверки доступности</small>
+    
     <h3>Источник метрик</h3>
     <select name="metric_source">
       <option value="auto" {% if s.metric_source=='auto' %}selected{% endif %}>Авто</option>

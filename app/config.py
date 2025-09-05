@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_username: Optional[str] = None
     smtp_password: Optional[str] = None
+    smtp_from: Optional[str] = None  # Alias for smtp_from_email
     smtp_from_email: Optional[str] = None
     smtp_use_tls: bool = True
     
@@ -55,6 +56,14 @@ class Settings(BaseSettings):
     telegram_chat_id: Optional[str] = None
     
     webhook_url: Optional[str] = None
+    default_webhook_url: Optional[str] = None  # Alias for webhook_url
+    
+    # Slack notifications
+    slack_webhook_url: Optional[str] = None
+    slack_channel: Optional[str] = None
+    
+    # Discord notifications
+    discord_webhook_url: Optional[str] = None
     
     # Remote monitoring
     ssh_timeout: int = 10

@@ -46,6 +46,9 @@ class Server(Base):
     snmp_version = Column(String(10), nullable=True)  # v2c
     snmp_community = Column(String(500), nullable=True)  # Encrypted
     metric_source = Column(String(20), default="auto")  # auto|local|ssh|snmp
+    # Service and port monitoring
+    services_to_monitor = Column(String(1000), nullable=True)  # JSON string of services to monitor
+    ports_to_monitor = Column(String(1000), nullable=True)  # JSON string of ports to monitor
     created_at = Column(DateTime, default=datetime.utcnow)
 
     metrics = relationship("Metric", back_populates="server", cascade="all, delete-orphan")
@@ -58,14 +61,30 @@ class Metric(Base):
     server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=False, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     cpu_percent = Column(Float, nullable=True)
+    cpu_temp = Column(Float, nullable=True)  # CPU temperature in Celsius
     ram_percent = Column(Float, nullable=True)
+    swap_percent = Column(Float, nullable=True)  # Swap usage percentage
     disk_percent = Column(Float, nullable=True)
+    disk_io_read = Column(Float, nullable=True)  # Disk I/O read MB/s
+    disk_io_write = Column(Float, nullable=True)  # Disk I/O write MB/s
     processes = Column(Integer, nullable=True)
     network_in_kbps = Column(Float, nullable=True)
     network_out_kbps = Column(Float, nullable=True)
     reachable = Column(Boolean, default=None)
+    services_status = Column(String(1000), nullable=True)  # JSON string of services status
+    ports_status = Column(String(1000), nullable=True)  # JSON string of ports status
 
     server = relationship("Server", back_populates="metrics")
+
+
+class AlertGroup(Base):
+    __tablename__ = "alert_groups"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    description = Column(String(500), nullable=True)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class AlertRule(Base):
@@ -74,13 +93,16 @@ class AlertRule(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)
     server_id = Column(Integer, ForeignKey("servers.id", ondelete="CASCADE"), nullable=True)
-    metric = Column(String(50), nullable=False)  # cpu|ram|disk|reachable|processes|net_in|net_out
+    group_id = Column(Integer, ForeignKey("alert_groups.id", ondelete="SET NULL"), nullable=True)
+    metric = Column(String(50), nullable=False)  # cpu|ram|disk|reachable|processes|net_in|net_out|cpu_temp|swap|disk_io
     operator = Column(String(5), nullable=False)  # >, <, =, !=
     threshold = Column(Float, nullable=True)
     enabled = Column(Boolean, default=True)
+    severity = Column(String(20), default="warning")  # info|warning|critical
     created_at = Column(DateTime, default=datetime.utcnow)
 
     server = relationship("Server", backref="alert_rules")
+    group = relationship("AlertGroup", backref="alert_rules")
 
 
 class AlertEvent(Base):

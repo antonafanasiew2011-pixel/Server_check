@@ -6,6 +6,9 @@
 {% block content %}
   <div class="dashboard-header">
     <h1>Дашборд мониторинга</h1>
+    <div class="page-actions" style="margin-bottom: 10px;">
+      <a href="/reports/export.pdf?report_type=servers" class="btn btn-secondary">📄 Экспорт PDF</a>
+    </div>
     <div class="dashboard-stats">
       <div class="stat-card">
         <div class="stat-value" id="total-servers">{{ servers|length }}</div>
@@ -58,6 +61,10 @@
           <span class="metric-value metric-badge" id="disk-{{ s.id }}">-</span>
         </div>
         <div class="metric-item">
+          <span class="metric-label">Temp</span>
+          <span class="metric-value metric-badge" id="temp-{{ s.id }}">-</span>
+        </div>
+        <div class="metric-item">
           <span class="metric-label">Processes</span>
           <span class="metric-value" id="proc-{{ s.id }}">-</span>
         </div>
@@ -87,17 +94,24 @@
       return await res.json();
     }
 
-    function getMetricClass(value) {
+    function getMetricClass(value, metricType = 'percent') {
       if (value === null || value === undefined) return 'metric-unknown';
-      if (value > 90) return 'metric-critical';
-      if (value > 75) return 'metric-warning';
-      return 'metric-ok';
+      
+      if (metricType === 'temperature') {
+        if (value > 80) return 'metric-critical';
+        if (value > 70) return 'metric-warning';
+        return 'metric-ok';
+      } else {
+        if (value > 90) return 'metric-critical';
+        if (value > 75) return 'metric-warning';
+        return 'metric-ok';
+      }
     }
 
-    function updateMetricBadge(element, value, suffix = '') {
+    function updateMetricBadge(element, value, suffix = '', metricType = 'percent') {
       if (element) {
         element.textContent = value !== null && value !== undefined ? `${value}${suffix}` : '-';
-        element.className = `metric-value metric-badge ${getMetricClass(value)}`;
+        element.className = `metric-value metric-badge ${getMetricClass(value, metricType)}`;
       }
     }
 
@@ -197,6 +211,7 @@
           updateMetricBadge(document.getElementById(`cpu-${s.id}`), latest.cpu_percent, '%');
           updateMetricBadge(document.getElementById(`ram-${s.id}`), latest.ram_percent, '%');
           updateMetricBadge(document.getElementById(`disk-${s.id}`), latest.disk_percent, '%');
+          updateMetricBadge(document.getElementById(`temp-${s.id}`), latest.cpu_temp, '°C', 'temperature');
           
           const procEl = document.getElementById(`proc-${s.id}`);
           if (procEl) procEl.textContent = latest.processes ?? '-';

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Группы алертов • Server Check{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Управление группами алертов</h1>
+    <div class="page-actions">
+      <a href="/alerts" class="btn btn-secondary">← Назад к алертам</a>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 10px;">
+    <h3 style="margin-left: 8px;">Создать новую группу алертов</h3>
+    <form method="post" action="/alert-groups" style="padding-top: 10px; padding-bottom: 10px">
+      <div class="form-row" style="margin-right: 10px; margin-left: 10px">
+        <div class="form-group">
+          <label class="form-label">Название группы</label>
+          <input name="name" class="form-control" placeholder="Введите название группы" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Описание</label>
+          <input name="description" class="form-control" placeholder="Описание группы (опционально)" />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-left: 8px;">Создать группу</button>
+    </form>
+  </div>
+
+  <div class="table-container">
+    <h3 style="margin-left: 8px;">Существующие группы алертов</h3>
+    <table class="servers-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Название</th>
+          <th>Описание</th>
+          <th>Статус</th>
+          <th>Создано</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for group in groups %}
+        <tr>
+          <td>{{ group.id }}</td>
+          <td><strong>{{ group.name }}</strong></td>
+          <td>{{ group.description or '—' }}</td>
+          <td>
+            <span class="status-badge {{ 'status-online' if group.enabled else 'status-offline' }}">
+              {{ 'Включена' if group.enabled else 'Отключена' }}
+            </span>
+          </td>
+          <td>
+            <span class="timestamp">{{ group.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <a href="/alerts?group_id={{ group.id }}" class="btn btn-sm btn-primary">👁 Просмотр алертов</a>
+              <form method="post" action="/alert-groups/{{ group.id }}/delete" style="display:inline;">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Удалить группу {{ group.name }}?')">🗑 Удалить</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if not groups %}
+  <div class="empty-state">
+    <p>Группы алертов не созданы. Создайте первую группу для организации ваших правил алертов.</p>
+  </div>
+  {% endif %}
+{% endblock %}
