@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}Дашборд • Server Check{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+  <div class="dashboard-header">
+    <h1>Дашборд мониторинга</h1>
+    <div class="dashboard-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="total-servers">{{ servers|length }}</div>
+        <div class="stat-label">Всего серверов</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="online-servers">-</div>
+        <div class="stat-label">Онлайн</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="offline-servers">-</div>
+        <div class="stat-label">Оффлайн</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="avg-cpu">-</div>
+        <div class="stat-label">Средняя CPU</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="servers-grid" id="servers-grid">
+    {% for s in servers %}
+    <div class="server-card" data-server-id="{{ s.id }}" onclick="window.location.href='/servers/{{ s.id }}'">
+      <div class="server-card-header">
+        <div>
+          <h3 class="server-card-title">{{ s.hostname }}</h3>
+          <p class="server-card-subtitle">{{ s.ip_address }}</p>
+        </div>
+        <div class="server-status">
+          <span class="status-indicator" id="status-{{ s.id }}"></span>
+          <span class="status-text" id="status-text-{{ s.id }}">Проверка...</span>
+        </div>
+      </div>
+      
+      <div class="chart-container">
+        <canvas id="cpuChart-{{ s.id }}" height="80"></canvas>
+      </div>
+      
+      <div class="server-card-metrics">
+        <div class="metric-item">
+          <span class="metric-label">CPU</span>
+          <span class="metric-value metric-badge" id="cpu-{{ s.id }}">-</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">RAM</span>
+          <span class="metric-value metric-badge" id="ram-{{ s.id }}">-</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Disk</span>
+          <span class="metric-value metric-badge" id="disk-{{ s.id }}">-</span>
+        </div>
+        <div class="metric-item">
+          <span class="metric-label">Processes</span>
+          <span class="metric-value" id="proc-{{ s.id }}">-</span>
+        </div>
+      </div>
+      
+      <div class="server-info">
+        <span class="server-tags">{{ s.tags or 'Без тегов' }}</span>
+        <span class="server-owner">{{ s.owner or 'Не указан' }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <script>
+    const charts = {};
+    let onlineCount = 0;
+    let offlineCount = 0;
+    let totalCpu = 0;
+    let cpuCount = 0;
+
+    async function fetchServers() {
+      const res = await fetch('/api/servers');
+      return await res.json();
+    }
+
+    async function fetchMetrics(serverId) {
+      const res = await fetch(`/api/metrics/${serverId}?minutes=180`);
+      return await res.json();
+    }
+
+    function getMetricClass(value) {
+      if (value === null || value === undefined) return 'metric-unknown';
+      if (value > 90) return 'metric-critical';
+      if (value > 75) return 'metric-warning';
+      return 'metric-ok';
+    }
+
+    function updateMetricBadge(element, value, suffix = '') {
+      if (element) {
+        element.textContent = value !== null && value !== undefined ? `${value}${suffix}` : '-';
+        element.className = `metric-value metric-badge ${getMetricClass(value)}`;
+      }
+    }
+
+    function upsertChart(el, labels, data) {
+      const ctx = el.getContext('2d');
+      const id = el.id;
+      
+      if (!charts[id]) {
+        charts[id] = new Chart(ctx, {
+          type: 'line',
+          data: { 
+            labels, 
+            datasets: [{ 
+              label: 'CPU %', 
+              data, 
+              borderColor: '#3b82f6', 
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              tension: 0.4, 
+              pointRadius: 0,
+              borderWidth: 2
+            }] 
+          },
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            scales: { 
+              y: { 
+                min: 0, 
+                max: 100,
+                grid: {
+                  color: 'rgba(0,0,0,0.1)'
+                }
+              },
+              x: {
+                display: false
+              }
+            }, 
+            plugins: { 
+              legend: { display: false },
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            },
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            }
+          }
+        });
+      } else {
+        charts[id].data.labels = labels;
+        charts[id].data.datasets[0].data = data;
+        charts[id].update('none');
+      }
+    }
+
+    function updateStats() {
+      const onlineEl = document.getElementById('online-servers');
+      const offlineEl = document.getElementById('offline-servers');
+      const avgCpuEl = document.getElementById('avg-cpu');
+      
+      if (onlineEl) onlineEl.textContent = onlineCount;
+      if (offlineEl) offlineEl.textContent = offlineCount;
+      if (avgCpuEl) avgCpuEl.textContent = cpuCount > 0 ? Math.round(totalCpu / cpuCount) + '%' : '-';
+    }
+
+    async function refresh() {
+      try {
+        const servers = await fetchServers();
+        onlineCount = 0;
+        offlineCount = 0;
+        totalCpu = 0;
+        cpuCount = 0;
+
+        for (const s of servers) {
+          const latest = s.latest_metric || {};
+          
+          // Update status
+          const statusEl = document.getElementById(`status-${s.id}`);
+          const statusTextEl = document.getElementById(`status-text-${s.id}`);
+          
+          if (latest.reachable === true) {
+            onlineCount++;
+            if (statusEl) statusEl.className = 'status-indicator online';
+            if (statusTextEl) statusTextEl.textContent = 'Онлайн';
+          } else if (latest.reachable === false) {
+            offlineCount++;
+            if (statusEl) statusEl.className = 'status-indicator offline';
+            if (statusTextEl) statusTextEl.textContent = 'Оффлайн';
+          } else {
+            if (statusEl) statusEl.className = 'status-indicator unknown';
+            if (statusTextEl) statusTextEl.textContent = 'Неизвестно';
+          }
+
+          // Update metrics
+          updateMetricBadge(document.getElementById(`cpu-${s.id}`), latest.cpu_percent, '%');
+          updateMetricBadge(document.getElementById(`ram-${s.id}`), latest.ram_percent, '%');
+          updateMetricBadge(document.getElementById(`disk-${s.id}`), latest.disk_percent, '%');
+          
+          const procEl = document.getElementById(`proc-${s.id}`);
+          if (procEl) procEl.textContent = latest.processes ?? '-';
+
+          // Update CPU stats
+          if (latest.cpu_percent !== null && latest.cpu_percent !== undefined) {
+            totalCpu += latest.cpu_percent;
+            cpuCount++;
+          }
+
+          // Update chart
+          try {
+            const hist = await fetchMetrics(s.id);
+            if (hist && hist.length > 0) {
+              const labels = hist.map(h => new Date(h.timestamp).toLocaleTimeString());
+              const cpu = hist.map(h => h.cpu_percent);
+              const canvas = document.getElementById(`cpuChart-${s.id}`);
+              if (canvas) upsertChart(canvas, labels, cpu);
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch metrics for server ${s.id}:`, error);
+          }
+        }
+
+        updateStats();
+      } catch (error) {
+        console.error('Failed to refresh dashboard:', error);
+      }
+    }
+
+    // Initial load
+    refresh();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(refresh, 30000);
+  </script>
+{% endblock %}
+
+

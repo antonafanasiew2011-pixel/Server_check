@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Редактирование сервера • Server Check{% endblock %}
+{% block content %}
+  <h2>Редактировать сервер</h2>
+  <form method="post" action="/servers/{{ s.id }}/edit" style="display:grid; gap:8px; max-width:800px;">
+    <input name="hostname" value="{{ s.hostname }}" placeholder="Hostname" required />
+    <input name="ip_address" value="{{ s.ip_address }}" placeholder="IP" required />
+    <input name="system_name" value="{{ s.system_name or '' }}" placeholder="Система" />
+    <input name="owner" value="{{ s.owner or '' }}" placeholder="Ответственный" />
+    <input name="tags" value="{{ s.tags or '' }}" placeholder="Теги (через запятую)" />
+    <div>
+      <label><input type="checkbox" name="is_cluster" value="true" {% if s.is_cluster %}checked{% endif %}/> Кластер</label>
+    </div>
+    <h3>SSH</h3>
+    <input name="ssh_host" value="{{ s.ssh_host or '' }}" placeholder="SSH host" />
+    <input name="ssh_port" value="{{ s.ssh_port or 22 }}" placeholder="SSH port" />
+    <input name="ssh_username" value="{{ s.ssh_username or '' }}" placeholder="SSH user" />
+    <input name="ssh_password" value="{{ s.ssh_password or '' }}" placeholder="SSH pass" />
+    <h3>SNMP</h3>
+    <input name="snmp_version" value="{{ s.snmp_version or 'v2c' }}" placeholder="SNMP ver (v2c)" />
+    <input name="snmp_community" value="{{ s.snmp_community or '' }}" placeholder="SNMP community" />
+    <h3>Источник метрик</h3>
+    <select name="metric_source">
+      <option value="auto" {% if s.metric_source=='auto' %}selected{% endif %}>Авто</option>
+      <option value="local" {% if s.metric_source=='local' %}selected{% endif %}>Local</option>
+      <option value="ssh" {% if s.metric_source=='ssh' %}selected{% endif %}>SSH</option>
+      <option value="snmp" {% if s.metric_source=='snmp' %}selected{% endif %}>SNMP</option>
+    </select>
+    <div>
+      <button type="submit">Сохранить</button>
+      <a href="/servers/{{ s.id }}">Отмена</a>
+    </div>
+  </form>
+{% endblock %}
+
+

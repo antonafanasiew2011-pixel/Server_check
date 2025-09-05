@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Алерты • Server Check{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Управление алертами</h1>
+    <div class="page-actions">
+      <button class="btn btn-secondary" onclick="location.reload()">🔄 Обновить</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-left: 8px;">Создать новое правило алерта</h3>
+    <form method="post" action="/alerts">
+      <div class="form-row" style="margin-right: 10px; margin-left: 10px">
+        <div class="form-group">
+          <label class="form-label">Название правила</label>
+          <input name="name" class="form-control" placeholder="Введите название" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Сервер</label>
+          <select name="server_id" class="form-control" required>
+            {% for s in servers %}
+            <option value="{{ s.id }}">{{ s.hostname }} ({{ s.ip_address }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Метрика</label>
+          <select name="metric" class="form-control" required>
+            <option value="cpu">CPU %</option>
+            <option value="ram">RAM %</option>
+            <option value="disk">Disk %</option>
+            <option value="processes">Processes</option>
+            <option value="net_in">Net In Kbps</option>
+            <option value="net_out">Net Out Kbps</option>
+            <option value="reachable">Reachable (1/0)</option>
+          </select>
+        <div class="form-group">
+          <label class="form-label">Оператор</label>
+          <select name="operator" class="form-control" required>
+            <option value=">">&gt; (больше)</option>
+            <option value="<">&lt; (меньше)</option>
+            <option value="=">= (равно)</option>
+            <option value="!=">!= (не равно)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Пороговое значение</label>
+          <input name="threshold" class="form-control" placeholder="Введите значение" required />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Создать правило</button>
+    </form>
+  </div>
+
+  <div class="table-container">
+    <h3 style="margin-left: 8px;">Активные правила алертов</h3>
+    <table class="servers-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Название</th>
+          <th>Сервер</th>
+          <th>Условие</th>
+          <th>Статус</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rules %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td><strong>{{ r.name }}</strong></td>
+          <td>{{ r.server_id }}</td>
+          <td>
+            <code>{{ r.metric }} {{ r.operator }} {{ r.threshold }}</code>
+          </td>
+          <td>
+            <span class="status-badge {{ 'status-online' if r.enabled else 'status-offline' }}">
+              {{ 'Включен' if r.enabled else 'Отключен' }}
+            </span>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <form method="post" action="/alerts/{{ r.id }}/toggle" style="display:inline;">
+                <button type="submit" class="btn btn-sm {{ 'btn-warning' if r.enabled else 'btn-success' }}">
+                  {{ 'Отключить' if r.enabled else 'Включить' }}
+                </button>
+              </form>
+              <form method="post" action="/alerts/{{ r.id }}/delete" style="display:inline;">
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Удалить правило {{ r.name }}?')">Удалить</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="table-container">
+    <h3 style="margin-left: 8px;">Последние события алертов</h3>
+    <table class="servers-table">
+      <thead>
+        <tr>
+          <th>Время</th>
+          <th>Правило</th>
+          <th>Сервер</th>
+          <th>Значение</th>
+          <th>Сообщение</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+        <tr>
+          <td>
+            <span class="timestamp">{{ e.timestamp.strftime('%d.%m.%Y %H:%M:%S') if e.timestamp else '—' }}</span>
+          </td>
+          <td>{{ e.rule_id }}</td>
+          <td>{{ e.server_id }}</td>
+          <td>
+            <span class="metric-badge metric-critical">{{ e.value }}</span>
+          </td>
+          <td>
+            <span class="details">{{ e.message }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+

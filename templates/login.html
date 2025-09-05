@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Вход • Server Check</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="/static/favicon.ico" />
+  <script src="/static/app.js"></script>
+  <style>
+    .login-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .login-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    
+    .login-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 6px 20px var(--shadow);
+    }
+    
+    .login-card h2 {
+      margin: 0 0 24px 0;
+      color: var(--text-primary);
+      font-size: 24px;
+      font-weight: 600;
+      text-align: center;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .form-control:focus {
+      outline: none;
+      border-color: var(--info, #3b82f6);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .radio-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .radio-item input[type="radio"] {
+      margin: 0;
+    }
+    
+    .error {
+      color: var(--error, #ef4444);
+      margin-bottom: 16px;
+      padding: 12px;
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    
+    .login-button {
+      width: 100%;
+      padding: 12px;
+      background: var(--info, #3b82f6);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .login-button:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    .ldap-disabled {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo">ВТБЛ</div>
+        <div class="brand-name">Server Check</div>
+      </div>
+    </header>
+    
+    <main class="login-content">
+      <div class="login-card">
+        <h2>Вход в систему</h2>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="post" action="/login">
+          <div class="form-group">
+            <label class="form-label">Логин</label>
+            <input name="username" type="text" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Пароль</label>
+            <input name="password" type="password" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Код 2FA (если включен)</label>
+            <input name="totp" type="text" class="form-control" placeholder="000000" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Способ входа</label>
+            <div class="radio-group">
+              <div class="radio-item">
+                <input type="radio" name="auth_type" value="local" id="auth_local" checked />
+                <label for="auth_local">Локальный</label>
+              </div>
+              <div class="radio-item">
+                <input type="radio" name="auth_type" value="ldap" id="auth_ldap" {% if not ldap_enabled %}disabled{% endif %} />
+                <label for="auth_ldap">Active Directory (LDAP)</label>
+              </div>
+            </div>
+            {% if not ldap_enabled %}
+              <div class="ldap-disabled">LDAP отключён (включите LDAP_ENABLED=true)</div>
+            {% endif %}
+          </div>
+          <div class="form-group">
+            <button type="submit" class="login-button">Войти</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+  
+  <script>
+    // Theme management for login page
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+    }
+    
+    // Initialize theme
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    });
+  </script>
+</body>
+</html>
+
+

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Серверы • Server Check{% endblock %}
+{% block head %}{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Управление серверами</h1>
+    <div class="page-actions">
+      {% if is_admin %}
+      <a href="/servers/export.csv" class="btn btn-secondary">
+        📊 Экспорт CSV
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="filters-card">
+    <form method="get" action="/servers" class="filters-form">
+      <div class="form-row">
+        <div class="form-group">
+          <input name="q" placeholder="Поиск по hostname или IP..." value="{{ params.q }}" class="form-control" />
+        </div>
+        <div class="form-group">
+          <input name="tag" placeholder="Фильтр по тегам..." value="{{ params.tag }}" class="form-control" />
+        </div>
+        <div class="form-group">
+          <select name="cluster" class="form-control">
+            <option value="">Все кластеры</option>
+            <option value="yes" {% if params.cluster=='yes' %}selected{% endif %}>Кластеры</option>
+            <option value="no" {% if params.cluster=='no' %}selected{% endif %}>Обычные серверы</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select name="reachable" class="form-control">
+            <option value="">Все статусы</option>
+            <option value="yes" {% if params.reachable=='yes' %}selected{% endif %}>Онлайн</option>
+            <option value="no" {% if params.reachable=='no' %}selected{% endif %}>Оффлайн</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select name="sort" class="form-control">
+            <option value="">Сортировка</option>
+            <option value="hostname" {% if params.sort=='hostname' %}selected{% endif %}>Hostname</option>
+            <option value="ip" {% if params.sort=='ip' %}selected{% endif %}>IP адрес</option>
+            <option value="reachable" {% if params.sort=='reachable' %}selected{% endif %}>Доступность</option>
+            <option value="cpu" {% if params.sort=='cpu' %}selected{% endif %}>CPU</option>
+            <option value="ram" {% if params.sort=='ram' %}selected{% endif %}>RAM</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">🔍 Применить фильтры</button>
+        <a href="/servers" class="btn btn-secondary">🔄 Сбросить</a>
+      </div>
+    </form>
+  </div>
+
+  {% if is_admin %}
+  <form method="post" action="/servers/import.csv" enctype="multipart/form-data" style="margin-bottom: 8px; margin-top:8px; display:flex; gap:8px; align-items:center;">
+    <input type="file" name="file" accept=".csv" />
+    <button type="submit">Импорт CSV</button>
+    <a href="/servers/export.csv">Экспорт CSV</a>
+  </form>
+  <form method="post" action="/servers" style="margin-bottom: 10px;">
+    <div class="row">
+      <input name="hostname" placeholder="Hostname" required />
+      <input name="ip_address" placeholder="IP" required />
+      <input name="system_name" placeholder="Система" />
+      <input name="owner" placeholder="Ответственный" />
+      <input name="tags" placeholder="Теги (через запятую)" />
+      <input name="ssh_host" placeholder="SSH host (опц.)" />
+      <input name="ssh_port" placeholder="port" value="22" style="width:80px;" />
+      <input name="ssh_username" placeholder="SSH user" />
+      <input name="ssh_password" placeholder="SSH pass" />
+      <input name="snmp_version" placeholder="SNMP ver (v2c)" />
+      <input name="snmp_community" placeholder="SNMP community" />
+      <label><input type="checkbox" name="is_cluster" value="true"/> Кластер</label>
+      <button style="margin-right: 0px; margin-left: 0px; margin-top: 10px;" type="submit">Добавить</button>
+    </div>
+  </form>
+  {% endif %}
+
+  <div class="table-container">
+    <table class="servers-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="hostname">Hostname</th>
+          <th class="sortable" data-sort="ip">IP адрес</th>
+          <th>Система</th>
+          <th>Ответственный</th>
+          <th>Кластер</th>
+          <th>Теги</th>
+          <th class="sortable" data-sort="reachable">Статус</th>
+          <th class="sortable" data-sort="cpu">CPU</th>
+          <th class="sortable" data-sort="ram">RAM</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in servers %}
+        <tr>
+          <td>
+            <div class="server-name">
+              <strong>{{ s.hostname }}</strong>
+              {% if s.is_cluster %}
+                <span class="cluster-badge">Кластер</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <code>{{ s.ip_address }}</code>
+          </td>
+          <td>{{ s.system_name or '—' }}</td>
+          <td>{{ s.owner or '—' }}</td>
+          <td>
+            {% if s.is_cluster %}
+              <span class="status-badge status-online">Да</span>
+            {% else %}
+              <span class="status-badge status-unknown">Нет</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.tags %}
+              <div class="tags">
+                {% for tag in s.tags.split(',') %}
+                  <span class="tag">{{ tag.strip() }}</span>
+                {% endfor %}
+              </div>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          {% set m = latest_map.get(s.id) %}
+          <td>
+            {% if m and m.reachable %}
+              <span class="status-badge status-online">🟢 Онлайн</span>
+            {% elif m and m.reachable == False %}
+              <span class="status-badge status-offline">🔴 Оффлайн</span>
+            {% else %}
+              <span class="status-badge status-unknown">⚪ Неизвестно</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if m and m.cpu_percent is not none %}
+              <span class="metric-badge {{ 'metric-critical' if m.cpu_percent > 90 else 'metric-warning' if m.cpu_percent > 75 else 'metric-ok' }}">
+                {{ "%.1f"|format(m.cpu_percent) }}%
+              </span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            {% if m and m.ram_percent is not none %}
+              <span class="metric-badge {{ 'metric-critical' if m.ram_percent > 90 else 'metric-warning' if m.ram_percent > 75 else 'metric-ok' }}">
+                {{ "%.1f"|format(m.ram_percent) }}%
+              </span>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            <div class="action-buttons">
+              <a href="/servers/{{ s.id }}" class="btn btn-sm btn-primary">👁 Подробнее</a>
+              {% if is_admin %}
+                <form method="post" action="/servers/{{ s.id }}/delete" style="display:inline;">
+                  <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Удалить сервер {{ s.hostname }}?')">🗑</button>
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if pagination %}
+  <div class="pagination">
+    {% if pagination.has_prev %}
+      <a href="?{{ request.query_params|urlencode }}&page={{ pagination.prev_num }}" class="btn btn-secondary">← Предыдущая</a>
+    {% endif %}
+    
+    {% for page_num in pagination.iter_pages() %}
+      {% if page_num %}
+        {% if page_num != pagination.page %}
+          <a href="?{{ request.query_params|urlencode }}&page={{ page_num }}" class="btn btn-secondary">{{ page_num }}</a>
+        {% else %}
+          <span class="btn btn-primary current">{{ page_num }}</span>
+        {% endif %}
+      {% else %}
+        <span class="btn btn-secondary disabled">...</span>
+      {% endif %}
+    {% endfor %}
+    
+    {% if pagination.has_next %}
+      <a href="?{{ request.query_params|urlencode }}&page={{ pagination.next_num }}" class="btn btn-secondary">Следующая →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</body>
+{% endblock %}
+
+

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}{{ server.hostname }} • Server Check{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h1>{{ server.hostname }}</h1>
+      <div class="server-meta">
+        <span class="meta-item">IP: <code>{{ server.ip_address }}</code></span>
+        <span class="meta-item">Система: {{ server.system_name or '—' }}</span>
+        <span class="meta-item">Ответственный: {{ server.owner or '—' }}</span>
+        {% if server.tags %}
+          <span class="meta-item">Теги: 
+            {% for tag in server.tags.split(',') %}
+              <span class="tag">{{ tag.strip() }}</span>
+            {% endfor %}
+          </span>
+        {% endif %}
+        {% if server.is_cluster %}
+          <span class="meta-item">
+            <span class="cluster-badge">Кластер</span>
+          </span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="page-actions">
+      <a href="/servers/{{ server.id }}/edit" class="btn btn-primary">✏️ Редактировать</a>
+      <a href="/servers" class="btn btn-secondary">← Назад к списку</a>
+    </div>
+  </div>
+
+  <div class="controls-card">
+    <div class="controls-row">
+      <div class="form-group">
+        <label class="form-label">Период отображения:</label>
+        <select id="range" class="form-control">
+          <option value="60">1 час</option>
+          <option value="180" selected>3 часа</option>
+          <option value="720">12 часов</option>
+          <option value="1440">1 день</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Автообновление:</label>
+        <button id="autoRefresh" class="btn btn-secondary">⏸️ Пауза</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-header">
+        <h3>🖥️ Загрузка процессора (CPU)</h3>
+        <p class="metric-description">Показывает процент использования центрального процессора сервера. Высокие значения (>80%) могут указывать на перегрузку системы.</p>
+      </div>
+      <div class="chart-container">
+        <canvas id="cpu"></canvas>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <h3>💾 Использование памяти (RAM)</h3>
+        <p class="metric-description">Отображает процент занятой оперативной памяти. Критический уровень (>90%) может привести к замедлению работы системы.</p>
+      </div>
+      <div class="chart-container">
+        <canvas id="ram"></canvas>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <h3>💿 Использование диска (Disk)</h3>
+        <p class="metric-description">Показывает процент заполнения дискового пространства. При достижении 95%+ система может перестать работать корректно.</p>
+      </div>
+      <div class="chart-container">
+        <canvas id="disk"></canvas>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <h3>🌐 Сетевая активность (Network)</h3>
+        <p class="metric-description">Отображает входящий сетевой трафик в килобитах в секунду. Помогает отслеживать нагрузку на сетевые интерфейсы.</p>
+      </div>
+      <div class="chart-container">
+        <canvas id="net"></canvas>
+      </div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-header">
+        <h3>⚙️ Количество процессов (Processes)</h3>
+        <p class="metric-description">Показывает общее количество запущенных процессов на сервере. Резкое увеличение может указывать на проблемы с приложениями.</p>
+      </div>
+      <div class="chart-container">
+        <canvas id="proc"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const sid = {{ server.id }};
+    let charts = {};
+    let autoRefreshInterval = null;
+    let isAutoRefreshEnabled = true;
+
+    function makeChart(id, label, yMax, color = '#3b82f6') {
+      const ctx = document.getElementById(id).getContext('2d');
+      charts[id] = new Chart(ctx, {
+        type: 'line',
+        data: { 
+          labels: [], 
+          datasets: [{ 
+            label, 
+            data: [], 
+            borderColor: color, 
+            backgroundColor: color + '20',
+            tension: 0.4, 
+            pointRadius: 0,
+            borderWidth: 2,
+            fill: true
+          }] 
+        },
+        options: { 
+          responsive: true, 
+          maintainAspectRatio: false,
+          scales: { 
+            y: yMax ? { min: 0, max: yMax } : { beginAtZero: true },
+            x: {
+              display: true,
+              grid: {
+                color: 'rgba(0,0,0,0.1)'
+              }
+            }
+          }, 
+          plugins: { 
+            legend: { display: false },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              titleColor: 'white',
+              bodyColor: 'white',
+              borderColor: color,
+              borderWidth: 1
+            }
+          },
+          interaction: {
+            intersect: false,
+            mode: 'index'
+          }
+        }
+      });
+    }
+
+    function updateChart(id, labels, data) {
+      if (charts[id]) {
+        charts[id].data.labels = labels;
+        charts[id].data.datasets[0].data = data;
+        charts[id].update('none');
+      }
+    }
+
+    async function load() {
+      try {
+        const minutes = document.getElementById('range').value;
+        const res = await fetch(`/api/metrics/${sid}?minutes=${minutes}`);
+        const hist = await res.json();
+        
+        if (hist.length === 0) {
+          console.warn('No metrics data available');
+          return;
+        }
+
+        const labels = hist.map(h => new Date(h.timestamp).toLocaleTimeString('ru-RU', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }));
+
+        updateChart('cpu', labels, hist.map(h => h.cpu_percent || 0));
+        updateChart('ram', labels, hist.map(h => h.ram_percent || 0));
+        updateChart('disk', labels, hist.map(h => h.disk_percent || 0));
+        updateChart('net', labels, hist.map(h => h.network_in_kbps || 0));
+        updateChart('proc', labels, hist.map(h => h.processes || 0));
+      } catch (error) {
+        console.error('Failed to load metrics:', error);
+        showNotification('Ошибка загрузки метрик', 'error');
+      }
+    }
+
+    function toggleAutoRefresh() {
+      const button = document.getElementById('autoRefresh');
+      
+      if (isAutoRefreshEnabled) {
+        clearInterval(autoRefreshInterval);
+        button.textContent = '▶️ Запуск';
+        button.className = 'btn btn-success';
+        isAutoRefreshEnabled = false;
+      } else {
+        autoRefreshInterval = setInterval(load, 10000);
+        button.textContent = '⏸️ Пауза';
+        button.className = 'btn btn-secondary';
+        isAutoRefreshEnabled = true;
+      }
+    }
+
+    // Initialize charts with different colors
+    makeChart('cpu', 'CPU %', 100, '#ef4444');
+    makeChart('ram', 'RAM %', 100, '#f59e0b');
+    makeChart('disk', 'Disk %', 100, '#10b981');
+    makeChart('net', 'Network Kbps', null, '#3b82f6');
+    makeChart('proc', 'Processes', null, '#8b5cf6');
+
+    // Load initial data
+    load();
+
+    // Event listeners
+    document.getElementById('range').addEventListener('change', load);
+    document.getElementById('autoRefresh').addEventListener('click', toggleAutoRefresh);
+
+    // Start auto-refresh
+    autoRefreshInterval = setInterval(load, 10000);
+  </script>
+{% endblock %}
+
+

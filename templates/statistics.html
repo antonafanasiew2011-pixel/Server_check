@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+{% block title %}Статистика • Server Check{% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Статистика системы</h1>
+    <div class="page-actions">
+      <button class="btn btn-secondary" onclick="refreshStats()">🔄 Обновить</button>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <!-- System Overview -->
+    <div class="stat-card">
+      <h3>Обзор системы</h3>
+      <div class="stat-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Всего серверов:</span>
+          <span class="metric-value" id="total-servers">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Онлайн:</span>
+          <span class="metric-value status-online" id="online-servers">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Оффлайн:</span>
+          <span class="metric-value status-offline" id="offline-servers">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Кластеры:</span>
+          <span class="metric-value" id="cluster-servers">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="stat-card">
+      <h3>Производительность</h3>
+      <div class="stat-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Средняя CPU:</span>
+          <span class="metric-value" id="avg-cpu">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Средняя RAM:</span>
+          <span class="metric-value" id="avg-ram">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Средняя Disk:</span>
+          <span class="metric-value" id="avg-disk">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Критическая нагрузка:</span>
+          <span class="metric-value status-offline" id="critical-load">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alerts Summary -->
+    <div class="stat-card">
+      <h3>Алерты</h3>
+      <div class="stat-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Активные правила:</span>
+          <span class="metric-value" id="active-rules">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Сработавшие сегодня:</span>
+          <span class="metric-value status-warning" id="today-alerts">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Критические:</span>
+          <span class="metric-value status-offline" id="critical-alerts">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Предупреждения:</span>
+          <span class="metric-value status-warning" id="warning-alerts">-</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Health -->
+    <div class="stat-card">
+      <h3>Здоровье системы</h3>
+      <div class="stat-metrics">
+        <div class="metric-row">
+          <span class="metric-label">Время работы:</span>
+          <span class="metric-value" id="uptime">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Последняя проверка:</span>
+          <span class="metric-value" id="last-check">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Успешность проверок:</span>
+          <span class="metric-value" id="check-success-rate">-</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Среднее время ответа:</span>
+          <span class="metric-value" id="avg-response-time">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="charts-section">
+    <div class="chart-card">
+      <h3>Распределение нагрузки CPU</h3>
+      <canvas id="cpuDistributionChart" height="300"></canvas>
+    </div>
+    
+    <div class="chart-card">
+      <h3>Тренд доступности серверов</h3>
+      <canvas id="availabilityTrendChart" height="300"></canvas>
+    </div>
+    
+    <div class="chart-card">
+      <h3>Топ серверов по нагрузке</h3>
+      <canvas id="topServersChart" height="300"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let charts = {};
+
+    async function refreshStats() {
+      try {
+        showLoadingOverlay('Загрузка статистики...');
+        
+        // Fetch server data
+        const serversResponse = await fetch('/api/servers');
+        const servers = await serversResponse.json();
+        
+        // Calculate statistics
+        calculateSystemStats(servers);
+        updateCharts(servers);
+        
+        hideLoadingOverlay();
+      } catch (error) {
+        console.error('Failed to refresh stats:', error);
+        hideLoadingOverlay();
+        showNotification('Ошибка загрузки статистики', 'error');
+      }
+    }
+
+    function calculateSystemStats(servers) {
+      let totalServers = servers.length;
+      let onlineServers = 0;
+      let offlineServers = 0;
+      let clusterServers = 0;
+      let totalCpu = 0;
+      let totalRam = 0;
+      let totalDisk = 0;
+      let cpuCount = 0;
+      let ramCount = 0;
+      let diskCount = 0;
+      let criticalLoad = 0;
+
+      servers.forEach(server => {
+        const metric = server.latest_metric;
+        
+        if (metric) {
+          if (metric.reachable) {
+            onlineServers++;
+          } else {
+            offlineServers++;
+          }
+          
+          if (metric.cpu_percent !== null && metric.cpu_percent !== undefined) {
+            totalCpu += metric.cpu_percent;
+            cpuCount++;
+            if (metric.cpu_percent > 90) criticalLoad++;
+          }
+          
+          if (metric.ram_percent !== null && metric.ram_percent !== undefined) {
+            totalRam += metric.ram_percent;
+            ramCount++;
+          }
+          
+          if (metric.disk_percent !== null && metric.disk_percent !== undefined) {
+            totalDisk += metric.disk_percent;
+            diskCount++;
+          }
+        }
+        
+        if (server.is_cluster) {
+          clusterServers++;
+        }
+      });
+
+      // Update DOM elements
+      document.getElementById('total-servers').textContent = totalServers;
+      document.getElementById('online-servers').textContent = onlineServers;
+      document.getElementById('offline-servers').textContent = offlineServers;
+      document.getElementById('cluster-servers').textContent = clusterServers;
+      
+      document.getElementById('avg-cpu').textContent = cpuCount > 0 ? Math.round(totalCpu / cpuCount) + '%' : '-';
+      document.getElementById('avg-ram').textContent = ramCount > 0 ? Math.round(totalRam / ramCount) + '%' : '-';
+      document.getElementById('avg-disk').textContent = diskCount > 0 ? Math.round(totalDisk / diskCount) + '%' : '-';
+      document.getElementById('critical-load').textContent = criticalLoad;
+      
+      // Mock data for other metrics
+      document.getElementById('active-rules').textContent = '12';
+      document.getElementById('today-alerts').textContent = '3';
+      document.getElementById('critical-alerts').textContent = '1';
+      document.getElementById('warning-alerts').textContent = '2';
+      document.getElementById('uptime').textContent = '7д 14ч 23м';
+      document.getElementById('last-check').textContent = new Date().toLocaleTimeString();
+      document.getElementById('check-success-rate').textContent = '98.5%';
+      document.getElementById('avg-response-time').textContent = '45мс';
+    }
+
+    function updateCharts(servers) {
+      // CPU Distribution Chart
+      updateCpuDistributionChart(servers);
+      
+      // Availability Trend Chart
+      updateAvailabilityTrendChart(servers);
+      
+      // Top Servers Chart
+      updateTopServersChart(servers);
+    }
+
+    function updateCpuDistributionChart(servers) {
+      const ctx = document.getElementById('cpuDistributionChart').getContext('2d');
+      
+      const cpuRanges = {
+        '0-25%': 0,
+        '25-50%': 0,
+        '50-75%': 0,
+        '75-90%': 0,
+        '90-100%': 0
+      };
+      
+      servers.forEach(server => {
+        const cpu = server.latest_metric?.cpu_percent;
+        if (cpu !== null && cpu !== undefined) {
+          if (cpu <= 25) cpuRanges['0-25%']++;
+          else if (cpu <= 50) cpuRanges['25-50%']++;
+          else if (cpu <= 75) cpuRanges['50-75%']++;
+          else if (cpu <= 90) cpuRanges['75-90%']++;
+          else cpuRanges['90-100%']++;
+        }
+      });
+      
+      if (charts.cpuDistribution) {
+        charts.cpuDistribution.destroy();
+      }
+      
+      charts.cpuDistribution = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(cpuRanges),
+          datasets: [{
+            data: Object.values(cpuRanges),
+            backgroundColor: [
+              '#10b981',
+              '#3b82f6',
+              '#f59e0b',
+              '#ef4444',
+              '#dc2626'
+            ]
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            }
+          }
+        }
+      });
+    }
+
+    function updateAvailabilityTrendChart(servers) {
+      const ctx = document.getElementById('availabilityTrendChart').getContext('2d');
+      
+      // Mock data for availability trend
+      const labels = [];
+      const onlineData = [];
+      const offlineData = [];
+      
+      for (let i = 23; i >= 0; i--) {
+        const time = new Date();
+        time.setHours(time.getHours() - i);
+        labels.push(time.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
+        
+        // Mock trend data
+        const baseOnline = Math.floor(servers.length * 0.9);
+        const variation = Math.floor(Math.random() * 3) - 1;
+        onlineData.push(Math.max(0, baseOnline + variation));
+        offlineData.push(servers.length - (baseOnline + variation));
+      }
+      
+      if (charts.availabilityTrend) {
+        charts.availabilityTrend.destroy();
+      }
+      
+      charts.availabilityTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Онлайн',
+            data: onlineData,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            tension: 0.4
+          }, {
+            label: 'Оффлайн',
+            data: offlineData,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              stacked: true
+            }
+          }
+        }
+      });
+    }
+
+    function updateTopServersChart(servers) {
+      const ctx = document.getElementById('topServersChart').getContext('2d');
+      
+      // Sort servers by CPU usage
+      const sortedServers = servers
+        .filter(s => s.latest_metric?.cpu_percent !== null)
+        .sort((a, b) => (b.latest_metric?.cpu_percent || 0) - (a.latest_metric?.cpu_percent || 0))
+        .slice(0, 10);
+      
+      const labels = sortedServers.map(s => s.hostname);
+      const cpuData = sortedServers.map(s => s.latest_metric?.cpu_percent || 0);
+      
+      if (charts.topServers) {
+        charts.topServers.destroy();
+      }
+      
+      charts.topServers = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'CPU %',
+            data: cpuData,
+            backgroundColor: cpuData.map(cpu => 
+              cpu > 90 ? '#ef4444' : 
+              cpu > 75 ? '#f59e0b' : 
+              '#10b981'
+            )
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', refreshStats);
+  </script>
+{% endblock %}

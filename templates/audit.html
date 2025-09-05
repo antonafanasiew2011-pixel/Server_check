@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Аудит • Server Check{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1>Журнал аудита</h1>
+    <div class="page-actions">
+      <button class="btn btn-secondary" onclick="location.reload()">🔄 Обновить</button>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table class="servers-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-sort="timestamp">Время</th>
+          <th class="sortable" data-sort="username">Пользователь</th>
+          <th class="sortable" data-sort="action">Действие</th>
+          <th>Детали</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in logs %}
+        <tr>
+          <td>
+            <span class="timestamp">{{ l.timestamp.strftime('%d.%m.%Y %H:%M:%S') if l.timestamp else '—' }}</span>
+          </td>
+          <td>
+            <strong>{{ l.username or '—' }}</strong>
+          </td>
+          <td>
+            <span class="action-badge action-{{ l.action.lower().replace(' ', '-') }}">
+              {{ l.action }}
+            </span>
+          </td>
+          <td>
+            <span class="details">{{ l.details or '—' }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+

@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Server Check{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="/static/favicon.ico" />
+  <script src="/static/app.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo">ВТБЛ</div>
+      <div class="brand-name">Server Check</div>
+    </div>
+    <nav class="nav">
+      <a href="/">Главная</a>
+      <a href="/servers">Серверы</a>
+      <a href="/statistics">Статистика</a>
+      <a href="/alerts">Алерты</a>
+      <a href="/audit">Аудит</a>
+      <a href="/users">Пользователи</a>
+      <a href="/profile">Профиль</a>
+      <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+      <a href="/logout">Выход</a>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  
+  <script>
+    // Theme management
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      
+      // Update button icon
+      const button = document.querySelector('.theme-toggle');
+      button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    }
+    
+    // Initialize theme
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      
+      // Update button icon
+      const button = document.querySelector('.theme-toggle');
+      button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+      
+      // CSRF tokens temporarily disabled
+    });
+  </script>
+</body>
+</html>
+
+

@@ -1,0 +1,39 @@
+{
+  "title": "Server Check Overview",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Reachable",
+      "targets": [{"expr": "sum(server_reachable)"}],
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4}
+    },
+    {
+      "type": "stat",
+      "title": "Servers",
+      "targets": [{"expr": "count(server_reachable)"}],
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4}
+    },
+    {
+      "type": "graph",
+      "title": "CPU % (by host)",
+      "targets": [{"expr": "server_cpu_percent"}],
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8}
+    },
+    {
+      "type": "graph",
+      "title": "RAM % (by host)",
+      "targets": [{"expr": "server_ram_percent"}],
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8}
+    },
+    {
+      "type": "graph",
+      "title": "Disk % (by host)",
+      "targets": [{"expr": "server_disk_percent"}],
+      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8}
+    }
+  ],
+  "schemaVersion": 36,
+  "version": 1
+}
+
