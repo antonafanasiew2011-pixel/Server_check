@@ -13,30 +13,42 @@
     </div>
   </div>
 
-  <div class="filters-card">
-    <form method="get" action="/servers" class="filters-form">
-      <div class="form-row">
+
+  <!-- Enhanced Filters -->
+  <div class="card filters-card">
+    <div class="card-header">
+      <h3>🔍 Фильтры и поиск</h3>
+      <div class="filter-actions">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAdvancedFilters()">
+          <span id="advanced-toggle-icon">⚙️</span> <span id="advanced-toggle-text">Расширенные</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="saveFilterPreset()">
+          💾 Сохранить
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="loadFilterPresets()">
+          📁 Загрузить
+        </button>
+      </div>
+        </div>
+    <div class="card-body">
+      <form method="get" action="/servers" class="filters-form" id="filters-form">
+        <!-- Basic Filters -->
+        <div class="filter-section">
+          <h4 class="filter-section-title">🔍 Основные фильтры</h4>
+          <div class="filters-form-row">
         <div class="form-group">
-          <input name="q" placeholder="Поиск по hostname или IP..." value="{{ params.q }}" class="form-control" />
+              <label class="form-label">Поиск</label>
+              <div class="search-input-group">
+                <input name="q" placeholder="Поиск по hostname, IP, системе..." value="{{ params.q }}" class="form-control search-input" />
+                <button type="button" class="search-clear" onclick="clearSearch()">✕</button>
+        </div>
         </div>
         <div class="form-group">
-          <input name="tag" placeholder="Фильтр по тегам..." value="{{ params.tag }}" class="form-control" />
+              <label class="form-label">Теги</label>
+              <input name="tag" placeholder="web,nginx,production" value="{{ params.tag }}" class="form-control" />
         </div>
         <div class="form-group">
-          <select name="cluster" class="form-control">
-            <option value="">Все кластеры</option>
-            <option value="yes" {% if params.cluster=='yes' %}selected{% endif %}>Кластеры</option>
-            <option value="no" {% if params.cluster=='no' %}selected{% endif %}>Обычные серверы</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <select name="reachable" class="form-control">
-            <option value="">Все статусы</option>
-            <option value="yes" {% if params.reachable=='yes' %}selected{% endif %}>Онлайн</option>
-            <option value="no" {% if params.reachable=='no' %}selected{% endif %}>Оффлайн</option>
-          </select>
-        </div>
-        <div class="form-group">
+              <label class="form-label">Среда</label>
           <select name="environment" class="form-control">
             <option value="">Все среды</option>
             <option value="test" {% if params.environment=='test' %}selected{% endif %}>🧪 Test</option>
@@ -45,152 +57,430 @@
           </select>
         </div>
         <div class="form-group">
-          <select name="sort" class="form-control">
-            <option value="">Сортировка</option>
-            <option value="hostname" {% if params.sort=='hostname' %}selected{% endif %}>Hostname</option>
-            <option value="ip" {% if params.sort=='ip' %}selected{% endif %}>IP адрес</option>
-            <option value="reachable" {% if params.sort=='reachable' %}selected{% endif %}>Доступность</option>
-            <option value="cpu" {% if params.sort=='cpu' %}selected{% endif %}>CPU</option>
-            <option value="ram" {% if params.sort=='ram' %}selected{% endif %}>RAM</option>
+              <label class="form-label">Статус</label>
+              <select name="reachable" class="form-control">
+                <option value="">Все статусы</option>
+                <option value="yes" {% if params.reachable=='yes' %}selected{% endif %}>🟢 Онлайн</option>
+                <option value="no" {% if params.reachable=='no' %}selected{% endif %}>🔴 Оффлайн</option>
           </select>
         </div>
       </div>
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">🔍 Применить фильтры</button>
-        <a href="/servers" class="btn btn-secondary">🔄 Сбросить</a>
+        </div>
+
+        <!-- Advanced Filters -->
+        <div class="filter-section advanced-filters" id="advanced-filters" style="display: none;">
+          <h4 class="filter-section-title">⚙️ Расширенные фильтры</h4>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">Тип сервера</label>
+              <select name="cluster" class="form-control">
+                <option value="">Все типы</option>
+                <option value="yes" {% if params.cluster=='yes' %}selected{% endif %}>🔄 Кластеры</option>
+                <option value="no" {% if params.cluster=='no' %}selected{% endif %}>🖥️ Обычные серверы</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ответственный</label>
+              <input name="owner" placeholder="admin@company.com" value="{{ params.owner }}" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Система</label>
+              <select name="system" class="form-control">
+                <option value="">Все системы</option>
+                <option value="Web Server" {% if params.system=='Web Server' %}selected{% endif %}>🌐 Web Server</option>
+                <option value="Database" {% if params.system=='Database' %}selected{% endif %}>🗄️ Database</option>
+                <option value="Application" {% if params.system=='Application' %}selected{% endif %}>⚙️ Application</option>
+                <option value="Monitoring" {% if params.system=='Monitoring' %}selected{% endif %}>📊 Monitoring</option>
+                <option value="Backup" {% if params.system=='Backup' %}selected{% endif %}>💾 Backup</option>
+                <option value="Load Balancer" {% if params.system=='Load Balancer' %}selected{% endif %}>⚖️ Load Balancer</option>
+                <option value="Cache" {% if params.system=='Cache' %}selected{% endif %}>🚀 Cache</option>
+                <option value="Mail Server" {% if params.system=='Mail Server' %}selected{% endif %}>📧 Mail Server</option>
+                <option value="File Server" {% if params.system=='File Server' %}selected{% endif %}>📁 File Server</option>
+                <option value="DNS Server" {% if params.system=='DNS Server' %}selected{% endif %}>🌍 DNS Server</option>
+                <option value="Proxy Server" {% if params.system=='Proxy Server' %}selected{% endif %}>🔒 Proxy Server</option>
+                <option value="Other" {% if params.system=='Other' %}selected{% endif %}>❓ Other</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sorting and Display -->
+        <div class="filter-section">
+          <h4 class="filter-section-title">📊 Сортировка и отображение</h4>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">Сортировка</label>
+              <select name="sort" class="form-control">
+                <option value="">По умолчанию</option>
+                <option value="hostname" {% if params.sort=='hostname' %}selected{% endif %}>🖥️ Hostname</option>
+                <option value="ip" {% if params.sort=='ip' %}selected{% endif %}>🌐 IP адрес</option>
+                <option value="reachable" {% if params.sort=='reachable' %}selected{% endif %}>📡 Доступность</option>
+                <option value="cpu" {% if params.sort=='cpu' %}selected{% endif %}>⚡ CPU</option>
+                <option value="ram" {% if params.sort=='ram' %}selected{% endif %}>💾 RAM</option>
+                <option value="environment" {% if params.sort=='environment' %}selected{% endif %}>🏷️ Среда</option>
+                <option value="system" {% if params.sort=='system' %}selected{% endif %}>⚙️ Система</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Показать на странице</label>
+              <select name="per_page" class="form-control">
+                <option value="25" {% if params.per_page=='25' %}selected{% endif %}>25 серверов</option>
+                <option value="50" {% if params.per_page=='50' %}selected{% endif %}>50 серверов</option>
+                <option value="100" {% if params.per_page=='100' %}selected{% endif %}>100 серверов</option>
+                <option value="all" {% if params.per_page=='all' %}selected{% endif %}>Все серверы</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Автообновление</label>
+              <div class="auto-refresh-group">
+                <select name="auto_refresh" class="form-control">
+                  <option value="">Выключено</option>
+                  <option value="30">30 секунд</option>
+                  <option value="60">1 минута</option>
+                  <option value="300">5 минут</option>
+                </select>
+                <span class="refresh-indicator" id="refresh-indicator" style="display: none;">🔄</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Filter Actions -->
+  <div class="card filter-actions-card">
+    <div class="card-body">
+      <div class="filter-actions" style="padding: 20px;">
+        <button type="submit" form="filters-form" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: #007bff; color: white; border: none; cursor: pointer; transition: all 0.3s ease; font-weight: 500; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+          <span class="btn-icon">🔍</span>
+          <span class="btn-text">Применить фильтры</span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+          <span class="btn-icon">🔄</span>
+          <span class="btn-text">Сбросить</span>
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="exportFilteredResults()">
+          <span class="btn-icon">📊</span>
+          <span class="btn-text">Экспорт результатов</span>
+        </button>
       </div>
-    </form>
+    </div>
   </div>
 
   {% if is_admin %}
-  <form method="post" action="/servers/import.csv" enctype="multipart/form-data" style="margin-bottom: 8px; margin-top:8px; display:flex; gap:8px; align-items:center;">
-    <input type="file" name="file" accept=".csv" />
-    <button type="submit">Импорт CSV</button>
-    <a href="/servers/export.csv">Экспорт CSV</a>
-  </form>
-  <form method="post" action="/servers" style="margin-bottom: 10px;">
-    <div class="row">
-      <input name="hostname" placeholder="Hostname" required />
-      <input name="ip_address" placeholder="IP" required />
-      <input name="system_name" placeholder="Система" />
-      <input name="owner" placeholder="Ответственный" />
-      <select name="environment" required>
-        <option value="prod">🏭 Prod</option>
-        <option value="stage">🚀 Stage</option>
-        <option value="test">🧪 Test</option>
-      </select>
-      <input name="tags" placeholder="Теги (через запятую)" />
-      <input name="ssh_host" placeholder="SSH host (опц.)" />
-      <input name="ssh_port" placeholder="port" value="22" style="width:80px;" />
-      <input name="ssh_username" placeholder="SSH user" />
-      <input name="ssh_password" placeholder="SSH pass" />
-      <input name="snmp_version" placeholder="SNMP ver (v2c)" />
-      <input name="snmp_community" placeholder="SNMP community" />
-      <input name="services_to_monitor" placeholder='Сервисы (JSON): ["nginx", "mysql"]' />
-      <input name="ports_to_monitor" placeholder='Порты (JSON): ["80", "443"]' />
-      <label><input type="checkbox" name="is_cluster" value="true"/> Кластер</label>
-      <button style="margin-right: 0px; margin-left: 0px; margin-top: 10px;" type="submit">Добавить</button>
+  <!-- Import/Export Actions -->
+  <div class="card import-export-card">
+    <div class="card-header">
+      <h3>📁 Импорт/Экспорт серверов</h3>
     </div>
+    <div class="card-body">
+      <form method="post" action="/servers/import.csv" enctype="multipart/form-data" class="import-form">
+        <div class="form-group">
+          <label class="form-label">📤 Импорт из CSV</label>
+          <input type="file" name="file" accept=".csv" class="form-control" />
+          <small class="form-text">Выберите CSV файл для импорта серверов</small>
+        </div>
+        <button type="submit" class="btn btn-primary">📥 Импортировать</button>
   </form>
+      <div class="export-section">
+        <a href="/servers/export.csv" class="btn btn-secondary">📤 Экспорт CSV</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Server Form -->
+  <div class="card add-server-card">
+    <div class="card-header">
+      <h3>➕ Добавить новый сервер</h3>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="toggleAddServerForm()">
+        <span id="toggle-icon">📝</span> <span id="toggle-text">Показать форму</span>
+      </button>
+    </div>
+    <div class="card-body" id="add-server-form" style="display: none;">
+      <form method="post" action="/servers" class="add-server-form">
+        <!-- Basic Information -->
+        <div class="form-section">
+          <h4 class="section-title">📋 Основная информация</h4>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">🖥️ Hostname *</label>
+              <input name="hostname" placeholder="server01.example.com" required class="form-control" />
+              <small class="form-text">Уникальное имя сервера</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">🌐 IP адрес *</label>
+              <input name="ip_address" placeholder="192.168.1.100" required class="form-control" />
+              <small class="form-text">IP адрес сервера</small>
+            </div>
+          </div>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">⚙️ Система</label>
+              <input name="system_name" placeholder="Web Server" class="form-control" />
+              <small class="form-text">Название системы или сервиса</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">👤 Ответственный</label>
+              <input name="owner" placeholder="admin@company.com" class="form-control" />
+              <small class="form-text">Контакт ответственного</small>
+            </div>
+          </div>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">🏷️ Среда *</label>
+              <select name="environment" required class="form-control">
+                <option value="">Выберите среду</option>
+                <option value="prod">🏭 Production</option>
+                <option value="stage">🚀 Staging</option>
+                <option value="test">🧪 Testing</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">🏷️ Теги</label>
+              <input name="tags" placeholder="web,nginx,production" class="form-control" />
+              <small class="form-text">Теги через запятую</small>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="is_cluster" value="true" />
+              <span class="checkbox-text">🔄 Кластер</span>
+            </label>
+            <small class="form-text">Отметьте, если это кластер серверов</small>
+          </div>
+        </div>
+
+        <!-- SSH Configuration -->
+        <div class="form-section">
+          <h4 class="section-title">🔐 SSH подключение</h4>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">🌐 SSH Host</label>
+              <input name="ssh_host" placeholder="192.168.1.100" class="form-control" />
+              <small class="form-text">IP или hostname для SSH (если отличается от основного)</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">🔌 SSH Port</label>
+              <input name="ssh_port" placeholder="22" value="22" class="form-control" />
+            </div>
+          </div>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">👤 SSH Username</label>
+              <input name="ssh_username" placeholder="root" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">🔑 SSH Password</label>
+              <input name="ssh_password" type="password" placeholder="••••••••" class="form-control" />
+              <small class="form-text">Рекомендуется использовать SSH ключи</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- SNMP Configuration -->
+        <div class="form-section">
+          <h4 class="section-title">📊 SNMP мониторинг</h4>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">📡 SNMP Version</label>
+              <select name="snmp_version" class="form-control">
+                <option value="">Не использовать SNMP</option>
+                <option value="v2c">v2c</option>
+                <option value="v3">v3</option>
+      </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">🔑 SNMP Community</label>
+              <input name="snmp_community" placeholder="public" class="form-control" />
+              <small class="form-text">Community string для SNMP v2c</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monitoring Configuration -->
+        <div class="form-section">
+          <h4 class="section-title">📈 Мониторинг сервисов и портов</h4>
+          <div class="filters-form-row">
+            <div class="form-group">
+              <label class="form-label">⚙️ Сервисы для мониторинга</label>
+              <input name="services_to_monitor" placeholder='["nginx", "mysql", "redis"]' class="form-control" />
+              <small class="form-text">JSON массив названий сервисов (systemctl)</small>
+            </div>
+            <div class="form-group">
+              <label class="form-label">🔌 Порты для мониторинга</label>
+              <input name="ports_to_monitor" placeholder='["80", "443", "3306"]' class="form-control" />
+              <small class="form-text">JSON массив номеров портов</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg">
+            <span class="btn-icon">➕</span>
+            <span class="btn-text">Добавить сервер</span>
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="resetAddServerForm()">
+            <span class="btn-icon">🔄</span>
+            <span class="btn-text">Сбросить</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
   {% endif %}
 
+  <!-- Servers Table -->
+  <div class="card servers-table-card">
+    <div class="card-header">
+      <h3>🖥️ Список серверов</h3>
+      <div class="table-actions">
+        <span class="servers-count">{{ servers|length }} серверов</span>
+        <div class="bulk-actions" id="bulk-actions" style="display: none;">
+          <span class="bulk-count">Выбрано: <span id="selected-count">0</span></span>
+          <button class="btn btn-sm btn-secondary" onclick="bulkEdit()">
+            ✏️ Редактировать
+          </button>
+          <button class="btn btn-sm btn-warning" onclick="bulkTag()">
+            🏷️ Добавить теги
+          </button>
+          <button class="btn btn-sm btn-error" onclick="bulkDelete()">
+            🗑️ Удалить
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <!-- Table View -->
+      <div id="table-view" class="table-view">
   <div class="table-container">
-    <table class="servers-table">
+          <table class="table servers-table">
       <thead>
         <tr>
-          <th class="sortable" data-sort="hostname">Hostname</th>
-          <th class="sortable" data-sort="ip">IP адрес</th>
-          <th>Система</th>
-          <th>Ответственный</th>
-          <th>Кластер</th>
-          <th>Среда</th>
-          <th>Теги</th>
-          <th class="sortable" data-sort="reachable">Статус</th>
-          <th class="sortable" data-sort="cpu">CPU</th>
-          <th class="sortable" data-sort="ram">RAM</th>
+                <th class="select-all-column">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="select-all" onchange="toggleSelectAll()" />
+                    <span class="checkbox-text">Все</span>
+                  </label>
+                </th>
+                <th class="sortable" data-sort="hostname">
+                  <span class="sort-icon">🖥️</span> Сервер
+                </th>
+                <th class="sortable" data-sort="reachable">
+                  <span class="sort-icon">📡</span> Статус
+                </th>
+                <th class="sortable" data-sort="cpu">
+                  <span class="sort-icon">⚡</span> CPU
+                </th>
+                <th class="sortable" data-sort="ram">
+                  <span class="sort-icon">💾</span> RAM
+                </th>
+                <th>
+                  <span class="sort-icon">🏷️</span> Среда
+                </th>
           <th>Действия</th>
         </tr>
       </thead>
       <tbody>
         {% for s in servers %}
-        <tr>
-          <td>
+              {% set m = latest_map.get(s.id) %}
+              <tr class="server-row" data-server-id="{{ s.id }}">
+                <td class="select-column">
+                  <label class="checkbox-label">
+                    <input type="checkbox" class="server-checkbox" value="{{ s.id }}" onchange="updateBulkActions()" />
+                  </label>
+                </td>
+                <td>
+                  <div class="server-info">
             <div class="server-name">
               <strong>{{ s.hostname }}</strong>
               {% if s.is_cluster %}
-                <span class="cluster-badge">Кластер</span>
+                        <span class="cluster-badge">🔄</span>
               {% endif %}
             </div>
-          </td>
-          <td>
-            <code>{{ s.ip_address }}</code>
-          </td>
-          <td>{{ s.system_name or '—' }}</td>
-          <td>{{ s.owner or '—' }}</td>
-          <td>
-            {% if s.is_cluster %}
-              <span class="status-badge status-online">Да</span>
-            {% else %}
-              <span class="status-badge status-unknown">Нет</span>
+                    <div class="server-details">
+                      <code class="ip-address">{{ s.ip_address }}</code>
+                      {% if s.system_name %}
+                        <span class="system-name">{{ s.system_name }}</span>
             {% endif %}
-          </td>
-          <td>
-            {% if s.environment == 'test' %}
-              <span class="environment-badge environment-test">🧪 Test</span>
-            {% elif s.environment == 'stage' %}
-              <span class="environment-badge environment-stage">🚀 Stage</span>
-            {% elif s.environment == 'prod' %}
-              <span class="environment-badge environment-prod">🏭 Prod</span>
-            {% else %}
-              <span class="environment-badge environment-unknown">❓ {{ s.environment or 'Unknown' }}</span>
-            {% endif %}
-          </td>
-          <td>
+                    </div>
             {% if s.tags %}
               <div class="tags">
-                {% for tag in s.tags.split(',') %}
+                        {% for tag in s.tags.split(',')[:3] %}
                   <span class="tag">{{ tag.strip() }}</span>
                 {% endfor %}
+                        {% if s.tags.split(',')|length > 3 %}
+                          <span class="tag-more">+{{ s.tags.split(',')|length - 3 }}</span>
+                        {% endif %}
               </div>
-            {% else %}
-              —
             {% endif %}
+                  </div>
           </td>
-          {% set m = latest_map.get(s.id) %}
           <td>
             {% if m and m.reachable %}
-              <span class="status-badge status-online">🟢 Онлайн</span>
+                    <span class="status-indicator online"></span>
+                    <span class="status-text">Онлайн</span>
             {% elif m and m.reachable == False %}
-              <span class="status-badge status-offline">🔴 Оффлайн</span>
+                    <span class="status-indicator offline"></span>
+                    <span class="status-text">Оффлайн</span>
             {% else %}
-              <span class="status-badge status-unknown">⚪ Неизвестно</span>
+                    <span class="status-indicator unknown"></span>
+                    <span class="status-text">Неизвестно</span>
             {% endif %}
           </td>
           <td>
             {% if m and m.cpu_percent is not none %}
+                    <div class="metric-display">
               <span class="metric-badge {{ 'metric-critical' if m.cpu_percent > 90 else 'metric-warning' if m.cpu_percent > 75 else 'metric-ok' }}">
                 {{ "%.1f"|format(m.cpu_percent) }}%
               </span>
+                      <div class="metric-bar">
+                        <div class="metric-fill metric-fill-cpu" data-width="{{ m.cpu_percent }}" data-value="{{ m.cpu_percent }}"></div>
+                      </div>
+                    </div>
             {% else %}
-              —
+                    <span class="metric-unknown">—</span>
             {% endif %}
           </td>
           <td>
             {% if m and m.ram_percent is not none %}
+                    <div class="metric-display">
               <span class="metric-badge {{ 'metric-critical' if m.ram_percent > 90 else 'metric-warning' if m.ram_percent > 75 else 'metric-ok' }}">
                 {{ "%.1f"|format(m.ram_percent) }}%
               </span>
+                      <div class="metric-bar">
+                        <div class="metric-fill metric-fill-ram" data-width="{{ m.ram_percent }}" data-value="{{ m.ram_percent }}"></div>
+                      </div>
+                    </div>
+                  {% else %}
+                    <span class="metric-unknown">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if s.environment == 'test' %}
+                    <span class="environment-badge environment-test">🧪</span>
+                  {% elif s.environment == 'stage' %}
+                    <span class="environment-badge environment-stage">🚀</span>
+                  {% elif s.environment == 'prod' %}
+                    <span class="environment-badge environment-prod">🏭</span>
             {% else %}
-              —
+                    <span class="environment-badge environment-unknown">❓</span>
             {% endif %}
           </td>
           <td>
             <div class="action-buttons">
-              <a href="/servers/{{ s.id }}" class="btn btn-sm btn-primary">👁 Подробнее</a>
+                    <a href="/servers/{{ s.id }}" class="btn btn-sm btn-primary" title="Подробнее">
+                      <span class="btn-icon">👁</span>
+                    </a>
               {% if is_admin %}
-                <form method="post" action="/servers/{{ s.id }}/delete" style="display:inline;">
-                  <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Удалить сервер {{ s.hostname }}?')">🗑</button>
-                </form>
+                      <a href="/servers/{{ s.id }}/edit" class="btn btn-sm btn-secondary" title="Редактировать">
+                        <span class="btn-icon">✏️</span>
+                      </a>
+                      <button type="button" class="btn btn-sm btn-error" data-server-id="{{ s.id }}" data-server-name="{{ s.hostname }}" onclick="deleteServerFromButton(this)" title="Удалить">
+                        <span class="btn-icon">🗑</span>
+                      </button>
               {% endif %}
             </div>
           </td>
@@ -198,6 +488,10 @@
         {% endfor %}
       </tbody>
     </table>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <!-- Pagination -->
@@ -224,7 +518,364 @@
     {% endif %}
   </div>
   {% endif %}
-</body>
+
+  <script>
+    // Toggle Add Server Form
+    function toggleAddServerForm() {
+      const form = document.getElementById('add-server-form');
+      const toggleIcon = document.getElementById('toggle-icon');
+      const toggleText = document.getElementById('toggle-text');
+      
+      if (form.style.display === 'none') {
+        form.style.display = 'block';
+        toggleIcon.textContent = '📝';
+        toggleText.textContent = 'Скрыть форму';
+        form.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        form.style.display = 'none';
+        toggleIcon.textContent = '📝';
+        toggleText.textContent = 'Показать форму';
+      }
+    }
+
+    // Reset Add Server Form
+    function resetAddServerForm() {
+      const form = document.querySelector('.add-server-form');
+      form.reset();
+      showNotification('Форма сброшена', 'info', 2000);
+    }
+
+
+    // Delete Server with Confirmation
+    function deleteServer(serverId, hostname) {
+      if (confirm(`Вы уверены, что хотите удалить сервер "${hostname}"?\n\nЭто действие нельзя отменить.`)) {
+        // Create form and submit
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/servers/${serverId}/delete`;
+        document.body.appendChild(form);
+        form.submit();
+      }
+    }
+
+    // Delete Server from Button
+    function deleteServerFromButton(button) {
+      const serverId = button.getAttribute('data-server-id');
+      const hostname = button.getAttribute('data-server-name');
+      deleteServer(serverId, hostname);
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      // Initialize metric bars
+      initializeMetricBars();
+      
+      // Add loading states to forms
+      const forms = document.querySelectorAll('form');
+      forms.forEach(form => {
+        form.addEventListener('submit', function() {
+          const submitBtn = form.querySelector('button[type="submit"]');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span> Обработка...';
+          }
+        });
+      });
+
+      // Add hover effects to server rows
+      const serverRows = document.querySelectorAll('.server-row');
+      serverRows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+          this.style.backgroundColor = 'var(--bg-tertiary)';
+        });
+        row.addEventListener('mouseleave', function() {
+          this.style.backgroundColor = '';
+        });
+      });
+    });
+
+    // Enhanced form validation
+    function validateServerForm() {
+      const form = document.querySelector('.add-server-form');
+      if (!form) {
+        console.error('Add server form not found');
+        return false;
+      }
+      
+      const hostname = form.querySelector('input[name="hostname"]');
+      const ipAddress = form.querySelector('input[name="ip_address"]');
+      const environment = form.querySelector('select[name="environment"]');
+      
+      if (!hostname || !ipAddress || !environment) {
+        console.error('Required form fields not found');
+        return false;
+      }
+      
+      let isValid = true;
+      
+      // Validate hostname
+      if (!hostname.value.trim()) {
+        showFieldError(hostname, 'Hostname обязателен');
+        isValid = false;
+      } else {
+        clearFieldError(hostname);
+      }
+      
+      // Validate IP address
+      const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+      if (!ipAddress.value.trim()) {
+        showFieldError(ipAddress, 'IP адрес обязателен');
+        isValid = false;
+      } else if (!ipRegex.test(ipAddress.value)) {
+        showFieldError(ipAddress, 'Неверный формат IP адреса');
+        isValid = false;
+      } else {
+        clearFieldError(ipAddress);
+      }
+      
+      // Validate environment
+      if (!environment.value) {
+        showFieldError(environment, 'Выберите среду');
+        isValid = false;
+      } else {
+        clearFieldError(environment);
+      }
+      
+      return isValid;
+    }
+
+    function showFieldError(field, message) {
+      clearFieldError(field);
+      field.classList.add('error');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'field-error';
+      errorDiv.textContent = message;
+      field.parentNode.appendChild(errorDiv);
+    }
+
+    function clearFieldError(field) {
+      field.classList.remove('error');
+      const errorDiv = field.parentNode.querySelector('.field-error');
+      if (errorDiv) {
+        errorDiv.remove();
+      }
+    }
+
+    // Initialize metric bars with animation
+    function initializeMetricBars() {
+      const metricFills = document.querySelectorAll('.metric-fill[data-value]');
+      
+      metricFills.forEach(fill => {
+        const value = parseFloat(fill.getAttribute('data-value'));
+        const width = fill.getAttribute('data-width');
+        
+        if (value > 90) {
+          fill.classList.add('critical');
+        } else if (value > 75) {
+          fill.classList.add('warning');
+        } else {
+          fill.classList.add('ok');
+        }
+        
+        // Animate the bar
+        setTimeout(() => {
+          fill.style.width = width + '%';
+        }, 100);
+      });
+    }
+
+    // Enhanced Filter Functions
+    function toggleAdvancedFilters() {
+      const filters = document.getElementById('advanced-filters');
+      const toggleIcon = document.getElementById('advanced-toggle-icon');
+      const toggleText = document.getElementById('advanced-toggle-text');
+      
+      if (filters.style.display === 'none') {
+        filters.style.display = 'block';
+        toggleIcon.textContent = '⚙️';
+        toggleText.textContent = 'Скрыть';
+      } else {
+        filters.style.display = 'none';
+        toggleIcon.textContent = '⚙️';
+        toggleText.textContent = 'Расширенные';
+      }
+    }
+
+    function clearSearch() {
+      document.querySelector('.search-input').value = '';
+      document.querySelector('.search-input').focus();
+    }
+
+    function resetFilters() {
+      document.getElementById('filters-form').reset();
+      showNotification('Фильтры сброшены', 'info', 2000);
+    }
+
+    function exportFilteredResults() {
+      const form = document.getElementById('filters-form');
+      const action = form.action;
+      form.action = '/servers/export.csv';
+      form.submit();
+      form.action = action;
+    }
+
+    // Bulk Operations
+    function toggleSelectAll() {
+      const selectAll = document.getElementById('select-all');
+      const checkboxes = document.querySelectorAll('.server-checkbox');
+      
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+      });
+      
+      updateBulkActions();
+    }
+
+    function updateBulkActions() {
+      const checkboxes = document.querySelectorAll('.server-checkbox:checked');
+      const bulkActions = document.getElementById('bulk-actions');
+      const selectedCount = document.getElementById('selected-count');
+      
+      selectedCount.textContent = checkboxes.length;
+      
+      if (checkboxes.length > 0) {
+        bulkActions.style.display = 'flex';
+      } else {
+        bulkActions.style.display = 'none';
+      }
+    }
+
+    function bulkEdit() {
+      const selected = getSelectedServers();
+      if (selected.length === 0) return;
+      
+      showNotification(`Редактирование ${selected.length} серверов`, 'info');
+      // TODO: Implement bulk edit modal
+    }
+
+    function bulkTag() {
+      const selected = getSelectedServers();
+      if (selected.length === 0) return;
+      
+      const tags = prompt('Введите теги через запятую:');
+      if (tags) {
+        showNotification(`Добавление тегов к ${selected.length} серверам`, 'info');
+        // TODO: Implement bulk tag update
+      }
+    }
+
+    function bulkDelete() {
+      const selected = getSelectedServers();
+      if (selected.length === 0) return;
+      
+      if (confirm(`Удалить ${selected.length} серверов? Это действие нельзя отменить.`)) {
+        showNotification(`Удаление ${selected.length} серверов`, 'warning');
+        // TODO: Implement bulk delete
+      }
+    }
+
+    function getSelectedServers() {
+      const checkboxes = document.querySelectorAll('.server-checkbox:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+
+    // Keyboard Shortcuts
+    function setupKeyboardShortcuts() {
+      document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey) {
+          switch(e.key) {
+            case 'n':
+              e.preventDefault();
+              toggleAddServerForm();
+              break;
+            case 'f':
+              e.preventDefault();
+              document.querySelector('.search-input').focus();
+              break;
+            case 'a':
+              e.preventDefault();
+              if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                toggleSelectAll();
+              }
+              break;
+          }
+        }
+      });
+    }
+
+    // Range Input Handlers
+    function setupRangeInputs() {
+      const rangeInputs = document.querySelectorAll('.range-input');
+      rangeInputs.forEach(input => {
+        input.addEventListener('input', function() {
+          const valueSpan = this.parentNode.querySelector('.range-value');
+          valueSpan.textContent = this.value + '%';
+        });
+      });
+    }
+
+    // Auto-refresh functionality
+    function setupAutoRefresh() {
+      const autoRefreshSelect = document.querySelector('select[name="auto_refresh"]');
+      if (autoRefreshSelect) {
+        autoRefreshSelect.addEventListener('change', function() {
+          const interval = parseInt(this.value);
+          if (interval > 0) {
+            startAutoRefresh(interval);
+          } else {
+            stopAutoRefresh();
+          }
+        });
+      }
+    }
+
+    let autoRefreshInterval;
+
+    function startAutoRefresh(seconds) {
+      stopAutoRefresh();
+      const indicator = document.getElementById('refresh-indicator');
+      indicator.style.display = 'inline';
+      
+      autoRefreshInterval = setInterval(() => {
+        location.reload();
+      }, seconds * 1000);
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+      }
+      document.getElementById('refresh-indicator').style.display = 'none';
+    }
+
+    // Add form validation on submit
+    document.addEventListener('DOMContentLoaded', function() {
+      const addServerForm = document.querySelector('.add-server-form');
+      if (addServerForm) {
+        console.log('Add server form found, adding submit listener');
+        addServerForm.addEventListener('submit', function(e) {
+          console.log('Form submit event triggered');
+          if (!validateServerForm()) {
+            console.log('Form validation failed, preventing submit');
+            e.preventDefault();
+            showNotification('Пожалуйста, исправьте ошибки в форме', 'error');
+          } else {
+            console.log('Form validation passed, allowing submit');
+          }
+        });
+      } else {
+        console.error('Add server form not found');
+      }
+      
+      // Initialize new features
+      setupKeyboardShortcuts();
+      setupRangeInputs();
+      setupAutoRefresh();
+    });
+  </script>
 {% endblock %}
 
 

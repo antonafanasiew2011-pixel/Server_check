@@ -147,6 +147,8 @@ async def list_servers(
     environment: str | None = None,  # 'test' | 'stage' | 'prod' | None
     sort: str | None = None,  # hostname|ip|reachable|cpu|ram
     tag: str | None = None,
+    system: str | None = None,  # system name filter
+    owner: str | None = None,  # owner filter
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
@@ -177,6 +179,10 @@ async def list_servers(
     if tag:
         t = tag.lower()
         enriched = [e for e in enriched if (e[0].tags and t in e[0].tags.lower())]
+    if system:
+        enriched = [e for e in enriched if e[0].system_name == system]
+    if owner:
+        enriched = [e for e in enriched if e[0].owner and owner.lower() in e[0].owner.lower()]
 
     # Sorting
     key_func = None
@@ -194,6 +200,8 @@ async def list_servers(
     elif sort == "ram":
         key_func = lambda e: (e[1].ram_percent if (e[1] and e[1].ram_percent is not None) else -1)
         reverse = True
+    elif sort == "system":
+        key_func = lambda e: (e[0].system_name or "").lower()
     if key_func:
         enriched.sort(key=key_func, reverse=reverse)
 
@@ -233,7 +241,7 @@ async def list_servers(
             "request": request,
             "servers": [e[0] for e in paginated_enriched],
             "latest_map": {e[0].id: e[1] for e in paginated_enriched},
-            "params": {"q": q or "", "cluster": cluster or "", "reachable": reachable or "", "environment": environment or "", "sort": sort or "", "tag": tag or ""},
+            "params": {"q": q or "", "cluster": cluster or "", "reachable": reachable or "", "environment": environment or "", "sort": sort or "", "tag": tag or "", "system": system or "", "owner": owner or ""},
             "is_admin": is_admin,
             "pagination": pagination,
         },
@@ -281,6 +289,24 @@ async def delete_server(request: Request, server_id: int, db: AsyncSession = Dep
     db.add(AuditLog(username=request.session.get("username"), action="server_delete", details=str(server_id)))
     await db.commit()
     return RedirectResponse(url="/servers", status_code=HTTP_302_FOUND)
+
+
+@router.get("/servers/export.csv")
+async def export_servers_csv(db: AsyncSession = Depends(get_db)):
+    servers = (await db.execute(select(Server))).scalars().all()
+    def gen():
+        yield "hostname,ip_address,system_name,owner,is_cluster,tags\n".encode("utf-8")
+        for s in servers:
+            row = [
+                s.hostname or "",
+                s.ip_address or "",
+                (s.system_name or "").replace(",", " "),
+                (s.owner or "").replace(",", " "),
+                "true" if s.is_cluster else "false",
+                (s.tags or "").replace(",", ";"),
+            ]
+            yield (",").join(row).encode("utf-8") + b"\n"
+    return StreamingResponse(gen(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=servers.csv"})
 
 
 @router.get("/servers/{server_id}")
@@ -572,23 +598,6 @@ async def create_alert_rule(request: Request, db: AsyncSession = Depends(get_db)
 
 
 # ---- CSV import/export ----
-
-@router.get("/servers/export.csv")
-async def export_servers_csv(db: AsyncSession = Depends(get_db)):
-    servers = (await db.execute(select(Server))).scalars().all()
-    def gen():
-        yield "hostname,ip_address,system_name,owner,is_cluster,tags\n".encode("utf-8")
-        for s in servers:
-            row = [
-                s.hostname or "",
-                s.ip_address or "",
-                (s.system_name or "").replace(",", " "),
-                (s.owner or "").replace(",", " "),
-                "true" if s.is_cluster else "false",
-                (s.tags or "").replace(",", ";"),
-            ]
-            yield (",").join(row).encode("utf-8") + b"\n"
-    return StreamingResponse(gen(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=servers.csv"})
 
 
 @router.post("/servers/import.csv")

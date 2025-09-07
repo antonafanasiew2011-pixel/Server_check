@@ -62,6 +62,7 @@ class MonitoringService:
                     "processes": metric.processes if metric else None,
                     "network_in_kbps": metric.network_in_kbps if metric else None,
                     "network_out_kbps": metric.network_out_kbps if metric else None,
+                    "network_io": round(((metric.network_in_kbps or 0) + (metric.network_out_kbps or 0)) / 1024, 2) if metric else None,  # Convert kbps to MB/s
                     "reachable": metric.reachable if metric else None,
                     "services_status": metric.services_status if metric else None,
                     "ports_status": metric.ports_status if metric else None,
@@ -107,6 +108,7 @@ class MonitoringService:
                 "processes": m.processes,
                 "network_in_kbps": m.network_in_kbps,
                 "network_out_kbps": m.network_out_kbps,
+                "network_io": round(((m.network_in_kbps or 0) + (m.network_out_kbps or 0)) / 1024, 2),  # Convert kbps to MB/s
                 "reachable": m.reachable,
                 "services_status": m.services_status,
                 "ports_status": m.ports_status,
@@ -174,6 +176,7 @@ class MonitoringService:
                 "processes": float(metric.processes) if metric.processes is not None else None,
                 "net_in": metric.network_in_kbps,
                 "net_out": metric.network_out_kbps,
+                "network_io": round(((metric.network_in_kbps or 0) + (metric.network_out_kbps or 0)) / 1024, 2),  # Convert kbps to MB/s
                 "reachable": 1.0 if metric.reachable else 0.0 if metric.reachable is not None else None,
             }
             

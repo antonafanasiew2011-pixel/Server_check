@@ -7,7 +7,7 @@
   </div>
 
   <div class="profile-grid">
-    <div class="card">
+    <div class="card" style="padding: 20px;">
       <h3 style="padding-left: 15px;">Информация о пользователе</h3>
       <div class="profile-info" style="padding: 15px;">
         <div class="info-row">
@@ -47,7 +47,7 @@
     {% if success %}<div class="success-message">{{ success }}</div>{% endif %}
 
     {% if not user.is_ldap %}
-    <div class="card">
+    <div class="card" style="padding: 20px;">
       <h3 style="padding-left: 15px;">Смена пароля</h3>
       <form method="post" action="/profile/password" style="padding: 15px;">
         <div class="form-group">
@@ -62,7 +62,7 @@
       </form>
     </div>
 
-    <div class="card">
+    <div class="card" style="padding: 20px;">
       <h3 style="padding-left: 15px;">Двухфакторная аутентификация (TOTP)</h3>
       <form method="post" action="/profile/2fa" style="padding: 15px;">
         {% if not user.totp_enabled %}

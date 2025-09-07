@@ -61,12 +61,8 @@
           <span class="metric-value metric-badge" id="disk-{{ s.id }}">-</span>
         </div>
         <div class="metric-item">
-          <span class="metric-label">Temp</span>
-          <span class="metric-value metric-badge" id="temp-{{ s.id }}">-</span>
-        </div>
-        <div class="metric-item">
-          <span class="metric-label">Processes</span>
-          <span class="metric-value" id="proc-{{ s.id }}">-</span>
+          <span class="metric-label">Net</span>
+          <span class="metric-value metric-badge" id="network-{{ s.id }}">-</span>
         </div>
       </div>
       
@@ -101,6 +97,12 @@
         if (value > 80) return 'metric-critical';
         if (value > 70) return 'metric-warning';
         return 'metric-ok';
+      } else if (metricType === 'network') {
+        // Network metrics - higher is generally better (more activity)
+        if (value > 100) return 'metric-ok';      // High network activity
+        if (value > 50) return 'metric-warning';  // Medium network activity
+        if (value > 0) return 'metric-ok';        // Low but active
+        return 'metric-unknown';                  // No activity
       } else {
         if (value > 90) return 'metric-critical';
         if (value > 75) return 'metric-warning';
@@ -211,10 +213,7 @@
           updateMetricBadge(document.getElementById(`cpu-${s.id}`), latest.cpu_percent, '%');
           updateMetricBadge(document.getElementById(`ram-${s.id}`), latest.ram_percent, '%');
           updateMetricBadge(document.getElementById(`disk-${s.id}`), latest.disk_percent, '%');
-          updateMetricBadge(document.getElementById(`temp-${s.id}`), latest.cpu_temp, '°C', 'temperature');
-          
-          const procEl = document.getElementById(`proc-${s.id}`);
-          if (procEl) procEl.textContent = latest.processes ?? '-';
+          updateMetricBadge(document.getElementById(`network-${s.id}`), latest.network_io ? Math.round(latest.network_io * 100) / 100 : null, ' MB/s', 'network');
 
           // Update CPU stats
           if (latest.cpu_percent !== null && latest.cpu_percent !== undefined) {

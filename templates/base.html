@@ -19,15 +19,41 @@
       <div class="brand-name">Server Check</div>
     </div>
     <nav class="nav">
-      <a href="/">Главная</a>
-      <a href="/servers">Серверы</a>
-      <a href="/statistics">Статистика</a>
-      <a href="/alerts">Алерты</a>
-      <a href="/audit">Аудит</a>
-      <a href="/users">Пользователи</a>
-      <a href="/profile">Профиль</a>
-      <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
-      <a href="/logout">Выход</a>
+      <a href="/" class="nav-link">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Главная</span>
+      </a>
+      <a href="/servers" class="nav-link">
+        <span class="nav-icon">🖥️</span>
+        <span class="nav-text">Серверы</span>
+      </a>
+      <a href="/statistics" class="nav-link">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">Статистика</span>
+      </a>
+      <a href="/alerts" class="nav-link">
+        <span class="nav-icon">🚨</span>
+        <span class="nav-text">Алерты</span>
+      </a>
+      <a href="/audit" class="nav-link">
+        <span class="nav-icon">📋</span>
+        <span class="nav-text">Аудит</span>
+      </a>
+      <a href="/users" class="nav-link">
+        <span class="nav-icon">👥</span>
+        <span class="nav-text">Пользователи</span>
+      </a>
+      <a href="/profile" class="nav-link">
+        <span class="nav-icon">👤</span>
+        <span class="nav-text">Профиль</span>
+      </a>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Переключить тему">
+        <span class="theme-icon">🌙</span>
+      </button>
+      <a href="/logout" class="nav-link logout">
+        <span class="nav-icon">🚪</span>
+        <span class="nav-text">Выход</span>
+      </a>
     </nav>
   </header>
   <main class="container">

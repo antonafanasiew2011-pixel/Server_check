@@ -297,9 +297,71 @@ class ServerCheckApp {
     }
 }
 
+// Enhanced Theme management
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+  
+  // Update button icon with animation
+  const button = document.querySelector('.theme-toggle .theme-icon');
+  if (button) {
+    button.style.transform = 'rotate(180deg)';
+    setTimeout(() => {
+      button.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+      button.style.transform = 'rotate(0deg)';
+    }, 150);
+  }
+}
+
+// Enhanced page loading animations
+function addPageAnimations() {
+  // Add fade-in animation to cards
+  const cards = document.querySelectorAll('.card, .server-card, .stat-card');
+  cards.forEach((card, index) => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(20px)';
+    setTimeout(() => {
+      card.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+      card.style.opacity = '1';
+      card.style.transform = 'translateY(0)';
+    }, index * 100);
+  });
+}
+
+// Enhanced active navigation
+function setActiveNavigation() {
+  const currentPath = window.location.pathname;
+  const navLinks = document.querySelectorAll('.nav-link');
+  
+  navLinks.forEach(link => {
+    link.classList.remove('active');
+    if (link.getAttribute('href') === currentPath) {
+      link.classList.add('active');
+    }
+  });
+}
+
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new ServerCheckApp();
+    
+    // Initialize theme
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    
+    // Update theme button icon
+    const button = document.querySelector('.theme-toggle .theme-icon');
+    if (button) {
+        button.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    }
+    
+    // Set active navigation
+    setActiveNavigation();
+    
+    // Add page animations
+    addPageAnimations();
 });
 
 // Global notification functions
@@ -379,3 +441,58 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// Range slider functionality
+function setupRangeInputs() {
+    const rangeInputs = document.querySelectorAll('.range-input');
+    
+    rangeInputs.forEach(input => {
+        // Update display value when slider changes
+        input.addEventListener('input', function() {
+            updateRangeValue(this);
+        });
+        
+        // Initialize display value
+        updateRangeValue(input);
+    });
+}
+
+function updateRangeValue(input) {
+    const valueSpan = input.parentNode.querySelector('.range-value');
+    if (valueSpan) {
+        valueSpan.textContent = input.value + '%';
+    }
+    
+    // Validate min/max relationship
+    validateRangeInputs(input);
+}
+
+function validateRangeInputs(input) {
+    const group = input.closest('.range-input-group');
+    if (!group) return;
+    
+    const minInput = group.querySelector('input[name$="_min"]');
+    const maxInput = group.querySelector('input[name$="_max"]');
+    
+    if (minInput && maxInput) {
+        const minValue = parseInt(minInput.value);
+        const maxValue = parseInt(maxInput.value);
+        
+        // If min is greater than max, adjust max to min + 1
+        if (minValue >= maxValue) {
+            maxInput.value = Math.min(minValue + 1, 100);
+            updateRangeValue(maxInput);
+        }
+        
+        // If max is less than min, adjust min to max - 1
+        if (maxValue <= minValue) {
+            minInput.value = Math.max(maxValue - 1, 0);
+            updateRangeValue(minInput);
+        }
+    }
+}
+
+// Initialize range inputs when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    setupRangeInputs();
+});
