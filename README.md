@@ -2,6 +2,17 @@
 
 FastAPI web app to manage servers (hostname, IP, system, owner, cluster flag), monitor reachability and local metrics, with local and LDAP login.
 
+## Tech Stack
+
+- Backend: FastAPI, Starlette, Uvicorn
+- Templates/Static: Jinja2, Vanilla JS/CSS
+- DB/ORM: SQLAlchemy (Async), SQLite (aiosqlite), Alembic
+- Auth/Security: Passlib (bcrypt), ItsDangerous, Session auth, TOTP (pyotp)
+- Networking/Monitoring: httpx, asyncssh (SSH), pysnmp (SNMP), psutil (local)
+- Rate limiting: slowapi (limits)
+- Other: python-dotenv, pydantic-settings
+- Containerization: Docker, Docker Compose
+
 ## 🔒 Security Features
 
 - **Rate Limiting**: Login attempts limited to 5 per 5 minutes per IP
@@ -102,4 +113,47 @@ New packages used:
 - asyncssh (SSH metrics)
 - pysnmp (SNMP v2c)
 - pyotp (2FA)
+
+## Docker
+
+Build image:
+
+```bash
+docker build -t server-check:latest .
+```
+
+Run with Docker Compose (recommended):
+
+```bash
+docker compose up -d --build
+```
+
+The app will be available at http://localhost:8000. SQLite database is stored in a named volume at `/data/server_check.db`.
+
+Override configuration via environment variables (examples):
+
+```bash
+set SECRET_KEY=supersecret
+set ENCRYPTION_KEY=supersecret2
+set ADMIN_DEFAULT_PASSWORD=ChangeMe123
+docker compose up -d
+```
+
+To stop:
+
+```bash
+docker compose down
+```
+
+## Integrations & Setup
+
+- Telegram: set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` to receive alerts.
+- SMTP Email: set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`.
+- Webhook: set `DEFAULT_WEBHOOK_URL` to send alerts to any HTTP endpoint.
+- Grafana: import `grafana/dashboard.json`; Prometheus scrapes `/metrics`.
+
+## Backups
+
+- The Compose file stores the SQLite database under the named volume at `/data/server_check.db`.
+- To make a quick backup on the host, stop the container (`docker compose down`), copy the volume contents, or use the provided `backups/` scripts as reference.
 

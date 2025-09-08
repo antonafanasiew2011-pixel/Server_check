@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  server_check:
+    build: .
+    image: server-check:latest
+    container_name: server_check
+    restart: unless-stopped
+    user: "0:0"
+    ports:
+      - "8000:8000"
+    environment:
+      # Override defaults as needed
+      - DATABASE_URL=sqlite+aiosqlite:////data/server_check.db
+      - SECRET_KEY=${SECRET_KEY:-changeme}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-changeme}
+      - ADMIN_DEFAULT_USERNAME=${ADMIN_DEFAULT_USERNAME:-admin}
+      - ADMIN_DEFAULT_PASSWORD=${ADMIN_DEFAULT_PASSWORD:-admin123}
+      - MONITORING_INTERVAL=${MONITORING_INTERVAL:-60}
+      - METRICS_RETENTION_DAYS=${METRICS_RETENTION_DAYS:-30}
+      - TELEGRAM_BOT_TOKEN
+      - TELEGRAM_CHAT_ID
+      - SMTP_HOST
+      - SMTP_PORT
+      - SMTP_USERNAME
+      - SMTP_PASSWORD
+      - SMTP_FROM
+      - DEFAULT_WEBHOOK_URL
+    volumes:
+      - app_data:/data
+      - type: bind
+        source: ./static
+        target: /app/static
+        read_only: true
+      - type: bind
+        source: ./templates
+        target: /app/templates
+        read_only: true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; urllib.request.urlopen('http://localhost:8000/health', timeout=3).read(); print('ok')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  app_data:
+    driver: local
+
+

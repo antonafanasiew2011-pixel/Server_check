@@ -1,0 +1,28 @@
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+
+# VCS
+.git/
+.gitignore
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local artifacts
+server_check.db
+backups/
+*.zip
+alembic/versions/__pycache__/
+
